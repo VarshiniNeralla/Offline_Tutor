@@ -505,10 +505,10 @@ Note: Jump STRAIGHT into the answer. Do NOT repeat textbook headings or general 
 """
         # Mode-specific settings
         config = {
-            "brief": {"predict": 250, "timeout": 90},
-            "standard": {"predict": 600, "timeout": 180},
-            "premium": {"predict": 1200, "timeout": 450}
-        }.get(mode, {"predict": 600, "timeout": 180})
+            "brief": {"predict": 250, "timeout": 180},
+            "standard": {"predict": 600, "timeout": 300},
+            "premium": {"predict": 1200, "timeout": 600}
+        }.get(mode, {"predict": 600, "timeout": 300})
         
         return self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
 
@@ -546,10 +546,10 @@ and respond in English.
 """
         # Mode-specific settings
         config = {
-            "brief": {"predict": 250, "timeout": 90},
-            "standard": {"predict": 600, "timeout": 180},
-            "premium": {"predict": 1200, "timeout": 300} 
-        }.get(mode, {"predict": 600, "timeout": 180})
+            "brief": {"predict": 250, "timeout": 180},
+            "standard": {"predict": 600, "timeout": 300},
+            "premium": {"predict": 1200, "timeout": 600} 
+        }.get(mode, {"predict": 600, "timeout": 300})
         
         return self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
     
@@ -558,10 +558,10 @@ and respond in English.
         # Pick defaults if not provided
         if num_predict is None or timeout is None:
             config = {
-                "brief": {"predict": 250, "timeout": 90},
-                "standard": {"predict": 600, "timeout": 180},
-                "premium": {"predict": 2048, "timeout": 450}
-            }.get(mode, {"predict": 600, "timeout": 180})
+                "brief": {"predict": 250, "timeout": 180},
+                "standard": {"predict": 600, "timeout": 300},
+                "premium": {"predict": 1200, "timeout": 600}
+            }.get(mode, {"predict": 600, "timeout": 300})
             num_predict = num_predict or config["predict"]
             timeout = timeout or config["timeout"]
         candidates = [self.model_name]
