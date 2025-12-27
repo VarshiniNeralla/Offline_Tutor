@@ -232,47 +232,135 @@ import {
   ChevronLeft,
   Trash2,
   FileText,
-  Languages
+  Languages,
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 
 import "../assets/styles/chat-interface.css";
 
 const ChatInterface = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { subject, class: className, bookId, bookName } = location.state || {};
+  const {
+    subject: navSubject,
+    class: navClass,
+    bookId: navBookId,
+    bookName: navBookName
+  } = location.state || {};
 
-  useEffect(() => {
-    if (!subject || !bookId) {
-      navigate("/student/dashboard");
-    }
-  }, [subject, bookId, navigate]);
+  // 1. CHAT HISTORY STATE
+  const [chats, setChats] = useState(() => {
+    const saved = localStorage.getItem("student_chats");
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content: `You are studying "${bookName}". Ask anything from this textbook.`,
-      sources: []
-    }
-  ]);
-
+  const [activeChatId, setActiveChatId] = useState(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("english");
   const [listening, setListening] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const bottomRef = useRef(null);
+  const hasInitialized = useRef(false);
+
+  // 2. INITIALIZE SESSION
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    if (!navSubject || !navBookId) {
+      if (chats.length === 0) {
+        navigate("/student/dashboard");
+      } else if (!activeChatId) {
+        setActiveChatId(chats[0].id);
+      }
+      return;
+    }
+
+    // Check if we already have a chat for this specific book
+    const existingBookChat = chats.find(c => c.bookId === navBookId);
+
+    if (existingBookChat) {
+      // Continue previous session
+      setActiveChatId(existingBookChat.id);
+    } else {
+      // Start fresh
+      startNewChat(navBookId, navBookName, navSubject, navClass, true);
+    }
+  }, [navBookId, navSubject, navigate, chats]);
+
+  // Sync chats to localStorage
+  useEffect(() => {
+    localStorage.setItem("student_chats", JSON.stringify(chats));
+  }, [chats]);
+
+  const currentChat = chats.find(c => c.id === activeChatId) || null;
+  const filteredChats = currentChat
+    ? chats.filter(c => c.bookId === currentChat.bookId)
+    : [];
+  const messages = currentChat ? currentChat.messages : [];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+  const startNewChat = (bId, bName, sub, cls, isAuto = false) => {
+    const targetBId = bId || navBookId || currentChat?.bookId;
+    const targetBName = bName || navBookName || currentChat?.bookName;
+    const targetSub = sub || navSubject || currentChat?.subject;
+    const targetCls = cls || navClass || currentChat?.className;
 
-    const userMessage = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    if (!targetBId) return;
+
+    const newId = Date.now().toString();
+    const newChat = {
+      id: newId,
+      title: "New Chat",
+      bookId: targetBId,
+      bookName: targetBName,
+      subject: targetSub,
+      className: targetCls,
+      messages: [
+        {
+          role: "assistant",
+          content: `You are studying "${targetBName}". Ask anything from this textbook.`,
+          sources: []
+        }
+      ],
+      timestamp: new Date().toISOString()
+    };
+
+    setChats(prev => {
+      // If it's an auto-start, don't create a duplicate if one already exists
+      if (isAuto && prev.find(c => c.bookId === targetBId)) return prev;
+      return [newChat, ...prev];
+    });
+    setActiveChatId(newId);
+  };
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading || !activeChatId) return;
+
+    const userContent = input.trim();
+    const userMessage = { role: "user", content: userContent };
+
+    // Update local messages immediately
+    const updatedMessages = [...messages, userMessage];
+
+    // Auto-update title if it's the first user message
+    const isFirstUserMsg = messages.filter(m => m.role === 'user').length === 0;
+    let newTitle = currentChat.title;
+    if (isFirstUserMsg) {
+      newTitle = userContent.length > 30 ? userContent.substring(0, 27) + "..." : userContent;
+    }
+
+    setChats(prev => prev.map(c =>
+      c.id === activeChatId ? { ...c, messages: updatedMessages, title: newTitle } : c
+    ));
+
     setInput("");
     setLoading(true);
 
@@ -281,142 +369,205 @@ const ChatInterface = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: input,
-          subjects: [subject],
-          book_ids: [bookId],
+          message: userContent,
+          subjects: [currentChat.subject],
+          book_ids: [currentChat.bookId],
           language
         })
       });
 
       const data = await res.json();
+      const assistantMessage = {
+        role: "assistant",
+        content: data.response,
+        sources: data.sources || []
+      };
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.response,
-          sources: data.sources || []
-        }
-      ]);
+      setChats(prev => prev.map(c =>
+        c.id === activeChatId ? { ...c, messages: [...updatedMessages, assistantMessage] } : c
+      ));
+
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "I couldn't access the textbook right now.",
-          sources: []
-        }
-      ]);
+      const errorMessage = {
+        role: "assistant",
+        content: "I couldn't access the textbook right now.",
+        sources: []
+      };
+      setChats(prev => prev.map(c =>
+        c.id === activeChatId ? { ...c, messages: [...updatedMessages, errorMessage] } : c
+      ));
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="chat-root">
-      {/* HEADER */}
-      <header className="chat-header">
-        <div className="chat-header-left">
-          <button className="icon-btn" onClick={() => navigate(-1)}>
-            <ChevronLeft size={20} />
-          </button>
+  const deleteChat = (e, id) => {
+    e.stopPropagation();
+    const newChats = chats.filter(c => c.id !== id);
+    setChats(newChats);
 
-          <div className="chat-context">
-            <h1>{bookName}</h1>
-            <p>
-              <BookOpen size={12} /> {subject} • {className}
-            </p>
+    // If we deleted the active chat, pick the next most recent one for THIS book
+    if (activeChatId === id) {
+      const remainingForBook = newChats.filter(c => c.bookId === currentChat?.bookId);
+      if (remainingForBook.length > 0) {
+        setActiveChatId(remainingForBook[0].id);
+      } else {
+        // If no chats left for this book, return to dashboard or start a new one
+        setActiveChatId(null);
+        hasInitialized.current = false; // Allow recovery effect to trigger
+      }
+    }
+  };
+
+  return (
+    <div className="chat-layout">
+      {/* SIDEBAR */}
+      <aside className={`chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
+        <div className="sidebar-header">
+          <button className="new-chat-btn" onClick={() => startNewChat()}>
+            <Sparkles size={16} /> New chat
+          </button>
+        </div>
+
+        <div className="sidebar-content">
+          <div className="history-group">
+            <span className="group-label">Previous Chats</span>
+            <div className="history-list">
+              {filteredChats.map(chat => (
+                <div
+                  key={chat.id}
+                  className={`history-item ${activeChatId === chat.id ? 'active' : ''}`}
+                  onClick={() => setActiveChatId(chat.id)}
+                >
+                  <FileText size={14} className="item-icon" />
+                  <div className="item-info">
+                    <span className="item-title">{chat.title}</span>
+                    <span className="item-meta">{chat.bookName}</span>
+                  </div>
+                  <button className="delete-btn" onClick={(e) => deleteChat(e, chat.id)}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="chat-header-right">
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-          >
-            <option value="english">English</option>
-            <option value="telugu">Telugu</option>
-          </select>
-
-          <button
-            className="icon-btn danger"
-            onClick={() =>
-              setMessages([
-                {
-                  role: "assistant",
-                  content: "Session cleared. Ask a fresh question.",
-                  sources: []
-                }
-              ])
-            }
-          >
-            <Trash2 size={18} />
-          </button>
+        <div className="sidebar-footer">
+          <div className="user-profile">
+            <div className="user-avatar">
+              {localStorage.getItem("studentName")?.charAt(0) || "S"}
+            </div>
+            <div className="user-info">
+              <span className="user-name">{localStorage.getItem("studentName") || "Student"}</span>
+              <span className="user-status">Online</span>
+            </div>
+          </div>
         </div>
-      </header>
+      </aside>
 
-      {/* CHAT */}
-      <main className="chat-body">
-        <AnimatePresence>
-          {messages.map((msg, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`chat-bubble ${msg.role}`}
-            >
-              <div className="chat-text">{msg.content}</div>
+      {/* MAIN CONTENT */}
+      <div className="chat-main">
+        {/* HEADER */}
+        <header className="chat-header">
+          <div className="chat-header-left">
+            <button className="icon-btn" onClick={() => navigate("/student/dashboard")}>
+              <ChevronLeft size={20} />
+            </button>
 
-              {msg.sources?.length > 0 && (
-                <div className="chat-sources">
-                  {msg.sources.map((s, idx) => (
-                    <span key={idx}>
-                      <FileText size={10} /> {s}
-                    </span>
-                  ))}
-                </div>
+            <div className="chat-context">
+              <h1>{currentChat?.title || "AI Tutor"}</h1>
+              {currentChat && (
+                <p>
+                  <BookOpen size={12} /> {currentChat.bookName} • {currentChat.subject}
+                </p>
               )}
-            </motion.div>
-          ))}
+            </div>
+          </div>
 
-          {loading && (
-            <motion.div className="chat-bubble assistant">
-              <div className="typing">
-                <span />
-                <span />
-                <span />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          <div className="chat-header-right">
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+            >
+              <option value="english">English</option>
+              <option value="telugu">Telugu</option>
+            </select>
+          </div>
+        </header>
 
-        <div ref={bottomRef} />
-      </main>
+        {/* CHAT */}
+        <main className="chat-body">
+          <AnimatePresence>
+            {messages.map((msg, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`chat-bubble ${msg.role}`}
+              >
+                <div className="chat-text">
+                  {msg.role === "assistant" ? (
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
 
-      {/* INPUT */}
-      <footer className="chat-input">
-        <button
-          className={`icon-btn ${listening ? "listening" : ""}`}
-          onClick={() => setListening(!listening)}
-        >
-          <Mic size={20} />
-        </button>
+                {msg.sources?.length > 0 && (
+                  <div className="chat-sources">
+                    {msg.sources.map((s, idx) => (
+                      <span key={idx}>
+                        <FileText size={10} /> {s}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            ))}
 
-        <input
-          placeholder={`Ask about ${bookName}...`}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-        />
+            {loading && (
+              <motion.div className="chat-bubble assistant">
+                <div className="typing">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        <button
-          className="send-btn"
-          disabled={!input.trim() || loading}
-          onClick={sendMessage}
-        >
-          <Send size={18} />
-        </button>
-      </footer>
+          <div ref={bottomRef} />
+        </main>
+
+        {/* INPUT */}
+        <footer className="chat-input">
+          <div className="input-wrapper">
+            <button
+              className={`icon-btn ${listening ? "listening" : ""}`}
+              onClick={() => setListening(!listening)}
+            >
+              <Mic size={20} />
+            </button>
+
+            <input
+              placeholder={currentChat ? `Ask about ${currentChat.bookName}...` : "Select a chat to begin..."}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+              disabled={!activeChatId}
+            />
+
+            <button
+              className="send-btn"
+              disabled={!input.trim() || loading || !activeChatId}
+              onClick={sendMessage}
+            >
+              <Send size={18} />
+            </button>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 };

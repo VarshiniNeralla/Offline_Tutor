@@ -300,6 +300,91 @@ class AITextbookTutorMultilingualBackendOffline:
             except Exception as e:
                 print(f"⚠️ Could not load vector database: {e}")
     
+    def detect_brevity_intent(self, question: str) -> str:
+        """Detect if user wants a brief, standard, or premium response with priority logic."""
+        question_lower = question.lower().strip()
+        
+        # Priority 1: Elaborate variants (Deep/Details)
+        elaborate_pattern = r'\b(detail|details|detailed|deeply|fully|elaborate|comprehensive|explain in detail|explain fully)\b'
+        if re.search(elaborate_pattern, question_lower):
+            return "premium"
+            
+        # Priority 2: Brief variants (Short/Quick)
+        brief_pattern = r'\b(brief|briefly|short|quick|summary|nutshell|in short|in a nutshell|minimal)\b'
+        if re.search(brief_pattern, question_lower):
+            return "brief"
+            
+        # Fallback: Standard Mode (Balanced)
+        return "standard"
+
+    def log_metrics(self, mode: str, tokens: int, duration: float, model: str):
+        """Log performance metrics to console and persistent JSON file with rotation."""
+        # 1. Console Log
+        print(f"⏱️ [{mode.capitalize()}] Generated {tokens} tokens in {duration:.2f}s using {model}")
+        
+        # 2. Persistent JSON Log
+        metrics_file = "performance_metrics.json"
+        metrics_data = []
+        
+        if os.path.exists(metrics_file):
+            try:
+                with open(metrics_file, 'r') as f:
+                    metrics_data = json.load(f)
+            except:
+                metrics_data = []
+        
+        new_entry = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "mode": mode,
+            "tokens": tokens,
+            "time": round(duration, 2),
+            "model": model
+        }
+        
+        metrics_data.append(new_entry)
+        
+        # Log Rotation: Keep last 500 entries
+        if len(metrics_data) > 500:
+            metrics_data = metrics_data[-500:]
+            
+        try:
+            with open(metrics_file, 'w') as f:
+                json.dump(metrics_data, f, indent=2)
+        except Exception as e:
+            print(f"⚠️ Failed to write metrics: {e}")
+
+    def clean_ai_response(self, text: str) -> str:
+        """Clean AI response by removing block indentation and trimming whitespace."""
+        if not text:
+            return ""
+            
+        # 1. Strip overall whitespace
+        text = text.strip()
+        
+        # 2. Aggressively remove common leading whitespace from all lines
+        lines = text.split('\n')
+        if len(lines) > 1:
+            # Only consider non-empty lines for indentation calculation
+            indents = []
+            for line in lines:
+                if line.strip():
+                    match = re.match(r'^(\s*)', line)
+                    indents.append(len(match.group(1)) if match else 0)
+            
+            if indents:
+                min_indent = min(indents)
+                if min_indent > 0:
+                    cleaned_lines = []
+                    for line in lines:
+                        if len(line) >= min_indent:
+                            cleaned_lines.append(line[min_indent:])
+                        else:
+                            cleaned_lines.append(line.lstrip())
+                    text = '\n'.join(cleaned_lines)
+        
+        # 3. Final trim and return
+        return text.strip()
+
     def is_general_conversation(self, question: str) -> bool:
         """Check if question is general conversation (no textbook search needed)"""
         general_patterns = [
@@ -354,54 +439,80 @@ class AITextbookTutorMultilingualBackendOffline:
         
         return self.call_llama(prompt, "")
 
-    def chat_with_textbook_context(self, question: str, context: str) -> str:
-        """AI response with textbook context - SMART GENERATION"""
+    def chat_with_textbook_context(self, question: str, context: str, mode: str = "standard") -> str:
+        """AI response with textbook context - DYNAMIC MODE SUPPORT"""
         if not self.llm_available:
             if self.language == 'telugu':
                 return f"పాఠ్యపుస్తక సమాచారం:\n\n{context}\n\nమరింత వివరాలు కావాలంటే దయచేసి నిర్దిష్ట ప్రశ్న అడగండి."
             else:
                 return f"From your textbook:\n\n{context}\n\nAsk a specific question if you need more details."
         
+        # 1. Define Prompt Structure based on Mode
+        if mode == "brief":
+            if self.language == 'telugu':
+                task_instr = "విద్యార్థి ప్రశ్నకు సంక్షిప్తంగా, ఒకే పేరాగ్రాఫ్‌లో సమాధానం ఇవ్వండి. అనవసరమైన వివరణలు వద్దు."
+            else:
+                task_instr = "Provide a very brief, single-paragraph answer to the student's question. Be concise and avoid extra details."
+        elif mode == "premium":
+            if self.language == 'telugu':
+                task_instr = """ముఖ్య గమనిక: విద్యార్థి అడిగిన ప్రశ్నకు మాత్రమే నేరుగా సమాధానం చెప్పండి. అనవసరమైన అంశాల జోలికి వెళ్లకండి.
+1. ప్రత్యక్ష సమాధానం: ప్రశ్నకు నేరుగా, వివరణాత్మక సమాధానం.
+2. వివరణ: సంక్లిష్టమైన అంశాలను సులభంగా వివరించండి.
+3. ఉదాహరణలు: కనీసం ఒక నిజ జీవిత ఉదాహరణ జోడించండి.
+4. ముగింపు: నేర్చుకోవడానికి ఒక ప్రోత్సాహకరమైన ముగింపు."""
+            else:
+                task_instr = """IMPORTANT: Focus ONLY on answering the student's question directly. Do not provide a general lecture.
+1. Direct Detailed Answer: A comprehensive answer focused strictly on the question.
+2. Conceptual Breakdown: Explain the 'why' and 'how' simply.
+3. Real-World Case Study: Provide aRelatable analogy or example.
+4. Summary & Logic: A quick recap of the answer's logic."""
+        else: # Standard
+            if self.language == 'telugu':
+                task_instr = """1. సమాధానం: విద్యార్థి ప్రశ్నకు నేరుగా సమాధానం ఇవ్వండి.
+2. వివరణ: అంశాన్ని క్లుప్తంగా వివరించండి.
+3. ముగింపు: నేర్చుకోవడానికి ఒక ప్రోత్సాహకరమైన ముగింపు."""
+            else:
+                task_instr = """1. Answer: A direct response to the question.
+2. Quick Explanation: A brief but clear context or explanation.
+3. Encouragement: A positive closing thought to keep them studying."""
+
+        # 2. Build Final Prompt
         if self.language == 'telugu':
-            prompt = f"""మీరు ఒక తెలివైన మరియు ప్రోత్సాహకరమైన తెలుగు ట్యూటర్. విద్యార్థికి ఒక అంశం గురించి లోతుగా అర్థం చేసుకోవడానికి సహాయం చేయడం మీ లక్ష్యం. దీని కోసం మీరు పాఠ్యపుస్తకం నుండి సేకరించిన సమాచారాన్ని ఉపయోగిస్తున్నారు.
+            prompt = f"""మీరు ఒక తెలివైన తెలుగు ట్యూటర్. పాఠ్యపుస్తకం నుండి సేకరించిన సమాచారాన్ని ఉపయోగించి విద్యార్థికి సహాయం చేయండి.
+            
+విద్యార్థి ప్రశ్న: "{question}"
 
-    విద్యార్థి ప్రశ్న: "{question}"
+సంబంధిత పాఠ్యపుస్తక సమాచారం:
+{context}
 
-    సంబంధిత పాఠ్యపుస్తక సమాచారం:
-    {context}
+మీ పని (User instructions override constraints):
+{task_instr}
 
-    మీ పని:
-    1.  **ప్రత్యక్ష సమాధానం:** మొదట, విద్యార్థి ప్రశ్నకు స్పష్టమైన, ప్రత్యక్ష సమాధానం ఇవ్వండి. సమాధానం కోసం మీరు పైన ఇచ్చిన పాఠ్యపుస్తకంలోని సమాచారాన్ని ఉపయోగించండి.
-    2.  **వివరమైన వివరణ:** సంక్లిష్టమైన ఆలోచనలను సులభంగా అర్థమయ్యేలా, సాధారణ పదాలలో విడదీసి వివరించండి.
-    3.  **నిజ జీవిత ఉదాహరణలు:** విద్యార్థికి ఆ అంశం సులభంగా అర్థం కావడానికి, కనీసం ఒక నిజ జీవిత ఉదాహరణ లేదా పోలికను జోడించండి.
-    4.  **కీలక అంశాల సారాంశం:** ప్రధాన అంశాలను ఒక చిన్న జాబితాలో లేదా ఒక పేరాగ్రాఫ్‌లో సంక్షిప్తంగా చెప్పండి.
-    5.  **ఆలోచింపజేసే ప్రశ్న:** విద్యార్థి అవగాహనను పరీక్షించడానికి, లేదా వారు ఆ అంశాన్ని కొత్త కోణంలో ఆలోచించేలా ప్రోత్సహించడానికి ఒక ఆలోచింపజేసే ప్రశ్నతో ముగించండి.
-    6.  **శైలి:** మొత్తం సమాధానంలో స్నేహపూర్వక, ప్రోత్సాహకరమైన శైలిని కొనసాగించండి.
-
-    సమాధానం తెలుగులో మాత్రమే ఇవ్వండి. మొత్తం సమాధానం ఒకే, స్పష్టమైన మరియు చక్కని నిర్మాణం గల వ్యాసంగా ఉండాలి.
-    """
+ముఖ్య గమనిక: పాఠ్యపుస్తక శీర్షికలను (headings) మళ్ళీ చెప్పవద్దు. మీరు నేరుగా సమాధానంతో ప్రారంభించండి. ఇండెంటేషన్ వద్దు.
+"""
         else:
-            prompt = f"""You are an intelligent and encouraging tutor. Your goal is to help a student deeply understand a topic by using a provided textbook excerpt.
+            prompt = f"""You are an intelligent AI tutor. Use the provided textbook excerpt to help the student.
+            
+Student Question: "{question}"
 
-    Student Question: "{question}"
+Relevant Textbook Content:
+{context}
 
-    Relevant Textbook Content:
-    {context}
+Your task (User instructions override constraints):
+{task_instr}
 
-    Your task:
-    1.  **Direct Answer:** Start with a clear, direct answer to the student's question, drawing from the provided text.
-    2.  **Detailed Explanation:** Expand on the answer by explaining the core concepts in your own words. Break down complex ideas into simple, digestible parts.
-    3.  **Real-World Application:** Provide at least one clear, real-world example or analogy that helps the student connect the abstract concept to something familiar.
-    4.  **Key Takeaways:** Summarize the main points in a simple list or a concise paragraph to reinforce learning.
-    5.  **Critical Thinking Follow-Up:** End with a thought-provoking question that prompts the student to think about the topic in a new way or apply the concept. This should go beyond simple recall.
-    6.  **Tone:** Maintain a warm, encouraging, and easy-to-read tone throughout the response.
-
-    Respond ONLY in English. Make the entire response a single, coherent, and well-structured piece of text.
-    """
+Note: Jump STRAIGHT into the answer. Do NOT repeat textbook headings or general greetings. Stay strictly on topic.
+"""
+        # Mode-specific settings
+        config = {
+            "brief": {"predict": 250, "timeout": 90},
+            "standard": {"predict": 600, "timeout": 180},
+            "premium": {"predict": 1200, "timeout": 450}
+        }.get(mode, {"predict": 600, "timeout": 180})
         
-        return self.call_llama(prompt, "")
+        return self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
 
-    def chat_with_general_knowledge(self, question: str) -> str:
+    def chat_with_general_knowledge(self, question: str, mode: str = "standard") -> str:
         """AI response using general knowledge when textbook doesn't have info"""
         if not self.llm_available:
             if self.language == 'telugu':
@@ -409,58 +520,64 @@ class AITextbookTutorMultilingualBackendOffline:
             else:
                 return "This topic is not in your textbook. Please ask your teacher."
         
+        # 1. Define Basic instructions based on mode
+        if mode == "brief":
+            prompt_instr = "Give a very short educational summary."
+        elif mode == "premium":
+            prompt_instr = "Provide a deep, comprehensive educational response with examples."
+        else:
+            prompt_instr = "Provide a helpful educational response."
+
         if self.language == 'telugu':
             prompt = f"""A Telugu student asked: "{question}"
+            
+{prompt_instr}
 
-    This question is not covered in their textbook. Use your general knowledge to provide a helpful educational response in Telugu.
-
-    Start with: "ఈ విషయం మీ పాఠ్యపుస్తకంలో లేదు, కానీ నేను వివరించగలను..."
-
-    Then, structure your response to be as helpful as possible:
-    1.  **స్పష్టమైన వివరణ:** ఆ అంశం గురించి స్పష్టమైన, కానీ సంక్షిప్తమైన వివరణ ఇవ్వండి.
-    2.  **సాధారణ ఉదాహరణలు:** ఒకటి లేదా రెండు సులభంగా అర్థమయ్యే ఉదాహరణలను ఉపయోగించి భావనను వివరించండి.
-    3.  **పాఠాలకు అనుసంధానం:** ఈ అంశం వారి సాధారణ అధ్యయనాలకు లేదా ప్రపంచానికి ఎలా సంబంధం కలిగి ఉంటుందో క్లుప్తంగా వివరించండి.
-    4.  **ఉపాధ్యాయుని సూచన:** మరింత లోతైన వివరణ కోసం వారి ఉపాధ్యాయుడితో చర్చించమని సున్నితంగా సూచించండి.
-    5.  **తదుపరి ప్రశ్న:** మీకు ఇంకా ఏమైనా ప్రశ్నలు ఉన్నాయా అని అడగండి.
-
-    సమాధానం తెలుగులో మాత్రమే ఇవ్వండి.
-    """
+Start with: "ఈ విషయం మీ పాఠ్యపుస్తకంలో లేదు, కానీ నేను వివరించగలను..."
+and respond in Telugu.
+"""
         else:
             prompt = f"""A student asked: "{question}"
 
-    This question is not covered in their textbook. Use your general knowledge to provide a helpful educational response.
+{prompt_instr}
 
-    Start with: "This topic isn't in your textbook, but I can help explain..."
-
-    Then, structure your response to be as helpful as possible:
-    1.  **Clear Explanation:** Provide a concise but comprehensive explanation of the topic.
-    2.  **Simple Examples:** Use 1-2 easy-to-understand examples to illustrate the concept.
-    3.  **Connection to Studies:** Briefly explain why this topic is relevant to their general studies or the world around them.
-    4.  **Teacher Recommendation:** Gently suggest they discuss this with their teacher for a deeper, more tailored explanation.
-    5.  **Follow-Up:** End by asking if they have any other questions.
-
-    Respond ONLY in English.
-    """
+Start with: "This topic isn't in your textbook, but I can help explain..."
+and respond in English.
+"""
+        # Mode-specific settings
+        config = {
+            "brief": {"predict": 250, "timeout": 90},
+            "standard": {"predict": 600, "timeout": 180},
+            "premium": {"predict": 1200, "timeout": 300} 
+        }.get(mode, {"predict": 600, "timeout": 180})
         
-        return self.call_llama(prompt, "")
+        return self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
     
-    def call_llama(self, prompt: str, context: str = "") -> str:
-        """Make API call to local Ollama with RUNTIME FALLBACK and RECOVERY"""
-        
-        # Priority: Current model -> phi3 -> phi (lighter models first for stability)
+    def call_llama(self, prompt: str, context: str = "", mode: str = "standard", num_predict: int = None, timeout: int = None) -> str:
+        """Make API call to local Ollama with dynamic budgets and robustness."""
+        # Pick defaults if not provided
+        if num_predict is None or timeout is None:
+            config = {
+                "brief": {"predict": 250, "timeout": 90},
+                "standard": {"predict": 600, "timeout": 180},
+                "premium": {"predict": 2048, "timeout": 450}
+            }.get(mode, {"predict": 600, "timeout": 180})
+            num_predict = num_predict or config["predict"]
+            timeout = timeout or config["timeout"]
         candidates = [self.model_name]
         if self.model_name == 'mistral':
             candidates.extend(['phi3', 'phi'])
         elif self.model_name == 'phi3':
             candidates.append('phi')
             
-        # Deduplicate
         candidates = list(dict.fromkeys(candidates))
-        
         last_error = ""
         
         for model in candidates:
-            print(f"🤖 Generating with {model}...")
+            # Skip heavy models for brief responses if they struggle
+            if mode == "brief" and model == "mistral":
+                continue
+                
             start_time = time.time()
             try:
                 response = requests.post(
@@ -472,87 +589,84 @@ class AITextbookTutorMultilingualBackendOffline:
                         "options": {
                             "temperature": 0.7,
                             "top_p": 0.9,
-                            "num_predict": 300
+                            "num_predict": num_predict
                         }
                     },
-                    timeout=300 
+                    timeout=timeout 
                 )
                 
                 duration = time.time() - start_time
                 
                 if response.status_code == 200:
+                    data = response.json()
+                    response_text = data['response']
+                    eval_count = data.get('eval_count', 0) # approximation for tokens
+                    
                     if model != self.model_name:
-                        print(f"⚠️ Switched to {model} for stability")
                         self.model_name = model
                     
-                    print(f"⏱️ Response generated in {duration:.2f}s using {model}")
-                    return response.json()['response']
+                    self.log_metrics(mode, eval_count, duration, model)
+                    return self.clean_ai_response(response_text)
                 else:
                     last_error = f"Error {response.status_code}"
-                    # Check for memory errors specifically
-                    try:
-                        err_detail = response.json().get('error', '')
-                        if 'memory' in err_detail.lower():
-                            last_error = "Out of system memory"
-                    except: pass
-                    
-                    print(f"❌ {model} failed ({duration:.2f}s): {last_error}")
-                    # Give Ollama a moment to recover from 500/Memory error
-                    time.sleep(2) 
             
+            except requests.exceptions.Timeout:
+                # FALLBACK LOGIC: If Premium/Standard times out, try to return a result from a faster model or mode
+                print(f"⌛ [{mode}] Request timed out for {model} after {timeout}s")
+                if mode == "premium":
+                    print("🔄 Falling back to Standard recovery...")
+                    # Recursive call but in standard mode for faster recovery
+                    return self.chat_with_textbook_context(prompt.split('"')[1], "...", mode="standard")
+                last_error = "Request Timeout"
             except Exception as e:
                 duration = time.time() - start_time
-                print(f"❌ {model} failed ({duration:.2f}s): {e}")
+                print(f"❌ {model} failed: {e}")
                 last_error = str(e)
-                time.sleep(2)
-                continue
+                time.sleep(1)
                 
         return f"❌ All AI models failed. Last error: {last_error}"
     
     def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
-        """SMART response routing with book-level scoping support"""
+        """SMART response routing with book-level scoping and intent-based optimization."""
         print(f"🧠 Processing question: {question[:50]}...")
+        # STEP 1: Detect Intent (Brevity vs Elaboration)
+        mode = self.detect_brevity_intent(question)
         
-        no_textbook_msg = "పాఠ్యపుస్తకాలు లోడ్ చేయబడలేదు!" if self.language == 'telugu' else "No textbooks loaded!"
-        
-        if not self.vectorstore:
-            return no_textbook_msg, []
-        
-        # STEP 1: Check if it's general conversation (no textbook search needed)
+        # STEP 2: Check if it's general conversation (no textbook search needed)
         if self.is_general_conversation(question):
-            print("💬 Detected general conversation - no textbook search")
-            response = self.chat_with_ai_directly(question)
-            return response, []
+            print(f"💬 Detected general conversation ({mode}) - no textbook search")
+            response = self.call_llama(question, mode=mode) 
+            return response, [], mode
         
-        # STEP 2: Search textbook with correct scoping
-        print(f"🔍 Searching textbook... (Books: {selected_books}, Subjects: {selected_subjects})")
+        # STEP 3: Search textbook with correct scoping
+        print(f"🔍 Searching textbook... Mode: {mode.upper()} | (Books: {selected_books}, Subjects: {selected_subjects})")
         
         filter_dict = None
         if selected_books:
-            # Explicit book scoping
             filter_dict = {"book_id": {"$in": selected_books}}
         elif selected_subjects:
-            # Fallback to subject scoping
             filter_dict = {"subject": {"$in": selected_subjects}}
         
+        search_start = time.time()
         try:
             relevant_docs = self.vectorstore.similarity_search(
                 question, 
-                k=2,
+                k=3 if mode == "premium" else 2, # More context for premium
                 filter=filter_dict
             )
+            search_duration = time.time() - search_start
+            print(f"⏱️ Content retrieval took {search_duration:.2f}s")
         except Exception as e:
-            print(f"⚠️ Search filter failed ({e}), falling back to unfiltered search")
+            search_duration = time.time() - search_start
+            print(f"⚠️ Search filter failed ({e}) after {search_duration:.2f}s, falling back to unfiltered search")
             relevant_docs = self.vectorstore.similarity_search(question, k=2)
         
-        # STEP 3: Smart routing based on search results
+        # STEP 4: Smart routing based on search results
         if relevant_docs and len(relevant_docs[0].page_content.strip()) > 100:
-            # Found good textbook content - use AI to process it
-            print("📚 Found textbook content - generating AI analysis...")
-            # Limit context size to prevent timeouts
+            print(f"📚 Found textbook content - generating {mode} AI analysis...")
             full_context = "\n\n".join([doc.page_content for doc in relevant_docs])
-            context = full_context[:2500] 
-            ai_response = self.chat_with_textbook_context(question, context)
+            context = full_context[:3500 if mode == "premium" else 2500] 
+            ai_response = self.chat_with_textbook_context(question, context, mode=mode)
             
             sources = []
             page_text = "పేజీ" if self.language == 'telugu' else "Page"
@@ -561,13 +675,12 @@ class AITextbookTutorMultilingualBackendOffline:
                 subject = doc.metadata.get('subject', 'Unknown')
                 sources.append(f"{subject} - {page_text} {page_num}")
             
-            return ai_response, sources
+            return ai_response, sources, mode
         
         else:
-            # No relevant textbook content - use AI general knowledge
-            print("🧠 No textbook content found - using AI general knowledge...")
-            ai_response = self.chat_with_general_knowledge(question)
-            return ai_response, []
+            print(f"🧠 No textbook content found - using AI general knowledge in {mode} mode...")
+            ai_response = self.chat_with_general_knowledge(question, mode=mode)
+            return ai_response, [], mode
 
 # For backward compatibility with your existing UI files
 AITextbookTutorMultilingualBackend = AITextbookTutorMultilingualBackendOffline

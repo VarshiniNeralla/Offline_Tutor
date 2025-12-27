@@ -90,7 +90,7 @@ async def chat(request: ChatRequest):
              tutor_backend.setup_telugu_asr_offline()
         tutor_backend.setup_offline_tts()
 
-    response_text, sources = tutor_backend.get_response(
+    response_text, sources, mode = tutor_backend.get_response(
         request.message, 
         selected_subjects=request.subjects,
         selected_books=request.book_ids
@@ -98,7 +98,8 @@ async def chat(request: ChatRequest):
     
     return {
         "response": response_text,
-        "sources": sources
+        "sources": sources,
+        "mode": mode
     }
 
 @app.get("/api/stats")
