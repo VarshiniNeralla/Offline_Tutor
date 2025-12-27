@@ -9,3 +9,6 @@ faster-whisper
 torch
 pyttsx3
 pypdf
+fastapi
+uvicorn
+python-multipart

@@ -8,11 +8,12 @@ from langchain_community.vectorstores import Chroma
 import requests
 from faster_whisper import WhisperModel
 import torch
-
 import pyttsx3  # OFFLINE TTS instead of gTTS
 import tempfile
 import io
 import re
+import time
+
 
 warnings.filterwarnings('ignore')
 
@@ -197,7 +198,7 @@ class AITextbookTutorMultilingualBackendOffline:
             
             transcribed_text = " ".join([segment.text for segment in segments])
             print(transcribed_text)
-            print("3hiiiiiii")
+            print("hiiiiiii")
             # Validate if output contains Telugu script
             has_telugu_script = any('\u0c00' <= char <= '\u0c7f' for char in transcribed_text)
             
@@ -245,23 +246,32 @@ class AITextbookTutorMultilingualBackendOffline:
             return None
     
     def check_llama_offline(self):
-        """Check local Ollama availability"""
+        """Check local Ollama availability with memory-safe fallback order"""
         print("🤖 Checking local AI availability...")
+        # Lighter models prioritized for 8GB RAM stability
+        fallback_order = ['phi3', 'phi', 'llama3.2', 'llama3.1', 'mistral', 'llama3']
         try:
-            # This is localhost communication, not internet
             response = requests.get("http://localhost:11434/api/tags", timeout=3)
             if response.status_code == 200:
                 models = response.json().get('models', [])
                 model_names = [model['name'] for model in models]
                 
-                if any('llama3.2' in name for name in model_names):
+                selected_model = None
+                for candidate in fallback_order:
+                    # Find matching model with its full tag
+                    match = next((name for name in model_names if candidate in name), None)
+                    if match:
+                        selected_model = match
+                        break
+                
+                if selected_model:
                     self.llm_available = True
-                    self.model_name = "llama3.2"
-                    print("✅ Local AI ready: Llama 3.2")
+                    self.model_name = selected_model
+                    print(f"✅ Local AI ready: {selected_model}")
                 elif models:
                     self.llm_available = True
                     self.model_name = model_names[0].split(':')[0]
-                    print(f"✅ Local AI ready: {self.model_name}")
+                    print(f"✅ Local AI ready (fallback): {self.model_name}")
                 else:
                     self.llm_available = False
                     print("⚠️ Ollama running but no models found")
@@ -270,7 +280,7 @@ class AITextbookTutorMultilingualBackendOffline:
                 print("⚠️ Ollama not responding properly")
         except:
             self.llm_available = False
-            print("⚠️ O  not running - will use basic textbook search")
+            print("⚠️ Ollama not running - will use basic textbook search")
     
     def load_existing_data(self):
         """Load existing textbook data offline"""
@@ -435,33 +445,72 @@ class AITextbookTutorMultilingualBackendOffline:
         return self.call_llama(prompt, "")
     
     def call_llama(self, prompt: str, context: str = "") -> str:
-        """Make API call to local Ollama"""
-        try:
-            response = requests.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": self.model_name,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.7,  # More creative
-                        "top_p": 0.9,
-                        "num_predict": 400
-                    }
-                },
-                timeout=60
-            )
-            
-            if response.status_code == 200:
-                return response.json()['response']
-            else:
-                return f"❌ AI Error: {response.status_code}"
+        """Make API call to local Ollama with RUNTIME FALLBACK and RECOVERY"""
         
-        except Exception as e:
-            return f"❌ AI Error: {str(e)}"
+        # Priority: Current model -> phi3 -> phi (lighter models first for stability)
+        candidates = [self.model_name]
+        if self.model_name == 'mistral':
+            candidates.extend(['phi3', 'phi'])
+        elif self.model_name == 'phi3':
+            candidates.append('phi')
+            
+        # Deduplicate
+        candidates = list(dict.fromkeys(candidates))
+        
+        last_error = ""
+        
+        for model in candidates:
+            print(f"🤖 Generating with {model}...")
+            start_time = time.time()
+            try:
+                response = requests.post(
+                    "http://localhost:11434/api/generate",
+                    json={
+                        "model": model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.7,
+                            "top_p": 0.9,
+                            "num_predict": 300
+                        }
+                    },
+                    timeout=300 
+                )
+                
+                duration = time.time() - start_time
+                
+                if response.status_code == 200:
+                    if model != self.model_name:
+                        print(f"⚠️ Switched to {model} for stability")
+                        self.model_name = model
+                    
+                    print(f"⏱️ Response generated in {duration:.2f}s using {model}")
+                    return response.json()['response']
+                else:
+                    last_error = f"Error {response.status_code}"
+                    # Check for memory errors specifically
+                    try:
+                        err_detail = response.json().get('error', '')
+                        if 'memory' in err_detail.lower():
+                            last_error = "Out of system memory"
+                    except: pass
+                    
+                    print(f"❌ {model} failed ({duration:.2f}s): {last_error}")
+                    # Give Ollama a moment to recover from 500/Memory error
+                    time.sleep(2) 
+            
+            except Exception as e:
+                duration = time.time() - start_time
+                print(f"❌ {model} failed ({duration:.2f}s): {e}")
+                last_error = str(e)
+                time.sleep(2)
+                continue
+                
+        return f"❌ All AI models failed. Last error: {last_error}"
     
-    def get_response(self, question: str, selected_subjects: list = None):
-        """SMART response routing - This fixes your main issue!"""
+    def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
+        """SMART response routing with book-level scoping support"""
         print(f"🧠 Processing question: {question[:50]}...")
         
         no_textbook_msg = "పాఠ్యపుస్తకాలు లోడ్ చేయబడలేదు!" if self.language == 'telugu' else "No textbooks loaded!"
@@ -475,26 +524,34 @@ class AITextbookTutorMultilingualBackendOffline:
             response = self.chat_with_ai_directly(question)
             return response, []
         
-        # STEP 2: Search textbook for subject-specific questions
-        print("🔍 Searching textbook for relevant content...")
+        # STEP 2: Search textbook with correct scoping
+        print(f"🔍 Searching textbook... (Books: {selected_books}, Subjects: {selected_subjects})")
+        
         filter_dict = None
-        if selected_subjects:
+        if selected_books:
+            # Explicit book scoping
+            filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects:
+            # Fallback to subject scoping
             filter_dict = {"subject": {"$in": selected_subjects}}
         
         try:
             relevant_docs = self.vectorstore.similarity_search(
                 question, 
-                k=3,
+                k=2,
                 filter=filter_dict
             )
-        except:
-            relevant_docs = self.vectorstore.similarity_search(question, k=3)
+        except Exception as e:
+            print(f"⚠️ Search filter failed ({e}), falling back to unfiltered search")
+            relevant_docs = self.vectorstore.similarity_search(question, k=2)
         
         # STEP 3: Smart routing based on search results
         if relevant_docs and len(relevant_docs[0].page_content.strip()) > 100:
             # Found good textbook content - use AI to process it
             print("📚 Found textbook content - generating AI analysis...")
-            context = "\n\n".join([doc.page_content for doc in relevant_docs])
+            # Limit context size to prevent timeouts
+            full_context = "\n\n".join([doc.page_content for doc in relevant_docs])
+            context = full_context[:2500] 
             ai_response = self.chat_with_textbook_context(question, context)
             
             sources = []
