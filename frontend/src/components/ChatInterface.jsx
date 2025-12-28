@@ -247,7 +247,8 @@ const ChatInterface = () => {
     subject: navSubject,
     class: navClass,
     bookId: navBookId,
-    bookName: navBookName
+    bookName: navBookName,
+    initTool
   } = location.state || {};
 
   // 1. CHAT HISTORY STATE
@@ -281,6 +282,15 @@ const ChatInterface = () => {
     }
 
     // Check if we already have a chat for this specific book
+    // For specific tools, we might prefer a fresh chat, but for now we'll just append context if needed?
+    // actually simpler: if initTool is present, force a new chat for that tool context to keep things clean?
+    // or just start a normal chat. Let's start a new chat if initTool is set to preserve "freshness"
+
+    if (initTool) {
+      startNewChat(navBookId, navBookName, navSubject, navClass, true, initTool);
+      return;
+    }
+
     const existingBookChat = chats.find(c => c.bookId === navBookId);
 
     if (existingBookChat) {
@@ -290,7 +300,7 @@ const ChatInterface = () => {
       // Start fresh
       startNewChat(navBookId, navBookName, navSubject, navClass, true);
     }
-  }, [navBookId, navSubject, navigate, chats]);
+  }, [navBookId, navSubject, navigate, chats, initTool]);
 
   // Sync chats to localStorage
   useEffect(() => {
@@ -307,7 +317,7 @@ const ChatInterface = () => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const startNewChat = (bId, bName, sub, cls, isAuto = false) => {
+  const startNewChat = (bId, bName, sub, cls, isAuto = false, toolType = null) => {
     const targetBId = bId || navBookId || currentChat?.bookId;
     const targetBName = bName || navBookName || currentChat?.bookName;
     const targetSub = sub || navSubject || currentChat?.subject;
@@ -315,10 +325,58 @@ const ChatInterface = () => {
 
     if (!targetBId) return;
 
+    // Custom Greeting based on Tool
+    let initialMsg = `You are studying "${targetBName}". Ask anything from this textbook.`;
+    let title = "New Chat";
+
+    if (toolType) {
+      title = `${toolType.charAt(0).toUpperCase() + toolType.slice(1)} Mode`;
+      switch (toolType) {
+        case 'quiz':
+          initialMsg = `I'm ready to generate a **Quiz** for *${targetBName}*. \n\nHow many questions would you like, and on which chapter?`;
+          break;
+        case 'flashcards':
+          initialMsg = `Let's create **Flashcards** for *${targetBName}*. \n\nWhich topic should I focus on?`;
+          break;
+        case 'summary':
+          initialMsg = `I can write a **Summary** for *${targetBName}*. \n\nDo you want a brief overview or a detailed Chapter summary?`;
+          break;
+        case 'mindmap':
+          initialMsg = `I'll help you structure a **Mind Map** for *${targetBName}*. \n\nWhat is the central concept you want to map out?`;
+          break;
+        case 'oral':
+          initialMsg = `Ready for your **Oral Test** on *${targetBName}*. \n\nI'll ask you questions one by one. Shall we begin?`;
+          break;
+        case 'match':
+          initialMsg = `Let's play **Match the Following** with concepts from *${targetBName}*. \n\nReady for the first set?`;
+          break;
+        case 'truefalse':
+          initialMsg = `I'll give you **True or False** statements from *${targetBName}*. \n\nPrepare yourself! Type 'Start' when ready.`;
+          break;
+        case 'revision':
+          initialMsg = `I'll generate a **One Page Revision Sheet** for *${targetBName}*. \n\nWhich chapter are we compressing today?`;
+          break;
+        case 'doubt':
+          initialMsg = `**Doubt Detector** active. \n\nPaste the paragraph from *${targetBName}* that is confusing you.`;
+          break;
+        case 'compare':
+          initialMsg = `**Compare & Contrast** mode. \n\nWhich two concepts from *${targetBName}* should we analyze side-by-side?`;
+          break;
+        case 'missed':
+          initialMsg = `**Gap Analysis** mode. \n\nPaste your answer relating to *${targetBName}* and I'll tell you what points you missed.`;
+          break;
+        case 'keywords':
+          initialMsg = `**Keyword Explorer**. \n\nList the terms from *${targetBName}* you want defined instantly.`;
+          break;
+        default:
+          initialMsg = `I'm ready to help with the **${toolType}** tool for *${targetBName}*. What do you need?`;
+      }
+    }
+
     const newId = Date.now().toString();
     const newChat = {
       id: newId,
-      title: "New Chat",
+      title: title,
       bookId: targetBId,
       bookName: targetBName,
       subject: targetSub,
@@ -326,7 +384,7 @@ const ChatInterface = () => {
       messages: [
         {
           role: "assistant",
-          content: `You are studying "${targetBName}". Ask anything from this textbook.`,
+          content: initialMsg,
           sources: []
         }
       ],
@@ -334,8 +392,8 @@ const ChatInterface = () => {
     };
 
     setChats(prev => {
-      // If it's an auto-start, don't create a duplicate if one already exists
-      if (isAuto && prev.find(c => c.bookId === targetBId)) return prev;
+      // If it's an auto-start, only skip if we are NOT in tool mode (tool mode always forces new)
+      if (isAuto && !toolType && prev.find(c => c.bookId === targetBId)) return prev;
       return [newChat, ...prev];
     });
     setActiveChatId(newId);

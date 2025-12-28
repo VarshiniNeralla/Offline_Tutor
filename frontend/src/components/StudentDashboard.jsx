@@ -13,7 +13,14 @@ import {
     FileText,
     Mic,
     Clock,
-    AlertCircle
+    AlertCircle,
+    Users,
+    Grid,
+    CheckSquare,
+    Layout,
+    Scale,
+    HelpCircle,
+    ListChecks
 } from "lucide-react";
 
 import "../assets/styles/student-dashboard.css";
@@ -47,25 +54,18 @@ const StudentDashboard = () => {
 
         setName(savedName);
         setStudentClass(savedClass);
-        fetchSubjects(savedClass); // Pass class directly to avoid state lag
+        fetchSubjects(savedClass);
     }, [navigate]);
 
     const fetchSubjects = async (targetClass) => {
-        // Use targetClass if provided, otherwise fallback to state
         const cls = targetClass || studentClass;
         if (!cls) return;
 
         try {
             const res = await fetch("/api/textbooks");
             const data = await res.json();
-
-            // 1. Filter by student's class
             const allBooks = Object.values(data);
             const classBooks = allBooks.filter(b => b.class_name === cls);
-
-            console.log(`Student dashboard sync: Class=[${cls}], Total=[${allBooks.length}], Filtered=[${classBooks.length}]`);
-
-            // 2. Group by subject name
             const grouped = classBooks.reduce((acc, book) => {
                 const subj = book.subject_name || "Unassigned";
                 if (!acc[subj]) {
@@ -78,7 +78,7 @@ const StudentDashboard = () => {
                 }
                 acc[subj].pages += book.pages || 0;
                 acc[subj].chunks += book.chunks || 0;
-                acc[subj].books.push(book); // Store full book object
+                acc[subj].books.push(book);
                 return acc;
             }, {});
 
@@ -95,29 +95,22 @@ const StudentDashboard = () => {
 
     return (
         <div className="dashboard-root">
-            {/* HEADER */}
             <header className="dashboard-header">
                 <div className="dashboard-header-inner">
                     <div className="user-info">
-                        <div className="user-avatar">
-                            <GraduationCap size={20} />
-                        </div>
+                        <div className="user-avatar"><GraduationCap size={20} /></div>
                         <div>
                             <h1>{name}</h1>
                             <p>{studentClass} Student</p>
                         </div>
                     </div>
-
                     <div className="header-actions">
                         <button onClick={() => navigate("/student/login")}>Change Class</button>
-                        <button className="logout" onClick={logout}>
-                            <LogOut size={18} />
-                        </button>
+                        <button className="logout" onClick={logout}><LogOut size={18} /></button>
                     </div>
                 </div>
             </header>
 
-            {/* CONTENT */}
             <main className="dashboard-container">
                 <AnimatePresence mode="wait">
                     {!activeSubject ? (
@@ -132,7 +125,6 @@ const StudentDashboard = () => {
                                     <h2>My Subjects</h2>
                                     <p>Select a subject to continue learning</p>
                                 </div>
-
                                 <div className="search-box">
                                     <Search size={16} />
                                     <input placeholder="Search subjects" />
@@ -178,18 +170,11 @@ const StudentDashboard = () => {
                                             transition={{ delay: idx * 0.08 }}
                                             onClick={() => setActiveSubject(sub)}
                                         >
-                                            <div className="subject-icon">
-                                                <BookOpen size={26} />
-                                            </div>
-
+                                            <div className="subject-icon"><BookOpen size={26} /></div>
                                             <h3>{sub.name}</h3>
-
                                             <div className="subject-meta">
-                                                <span>{sub.pages} pages</span>
-                                                <span>•</span>
-                                                <span>{sub.chunks} blocks</span>
+                                                <span>{sub.pages} pages</span><span>•</span><span>{sub.chunks} blocks</span>
                                             </div>
-
                                             <div className="subject-cta">
                                                 Open subject <ChevronRight size={16} />
                                             </div>
@@ -202,13 +187,14 @@ const StudentDashboard = () => {
                         <SubjectHome
                             subject={activeSubject}
                             onBack={() => setActiveSubject(null)}
-                            onStartBook={(book) =>
+                            onStartBook={(book, toolType = 'chat') =>
                                 navigate("/chat", {
                                     state: {
                                         subject: activeSubject.name,
                                         class: studentClass,
                                         bookId: book.book_id,
-                                        bookName: book.file_name
+                                        bookName: book.file_name,
+                                        initTool: toolType
                                     }
                                 })
                             }
@@ -221,6 +207,75 @@ const StudentDashboard = () => {
 };
 
 const SubjectHome = ({ subject, onBack, onStartBook }) => {
+    const [selectedTool, setSelectedTool] = useState(null);
+
+    const tools = [
+        { id: 'quiz', icon: Zap, title: "AI Quiz", desc: "Test understanding" },
+        { id: 'flashcards', icon: FileText, title: "Flashcards", desc: "Key concepts" },
+        { id: 'oral', icon: Mic, title: "Oral Test", desc: "Speak answers" },
+        { id: 'summary', icon: BookOpen, title: "Summaries", desc: "Chapter notes" },
+        { id: 'mindmap', icon: Users, title: "Mind Maps", desc: "Visualize connections" },
+        { id: 'match', icon: Grid, title: "Match It", desc: "Concept definitions" },
+        { id: 'truefalse', icon: CheckSquare, title: "True/False", desc: "Fact checking" },
+        { id: 'revision', icon: Layout, title: "One Page", desc: "Revision Sheet" },
+        { id: 'keywords', icon: Search, title: "Keywords", desc: "Term explorer" },
+        { id: 'compare', icon: Scale, title: "Compare", desc: "Side by side" },
+        { id: 'doubt', icon: HelpCircle, title: "Doubt", desc: "Detector" },
+        { id: 'missed', icon: ListChecks, title: "Missed?", desc: "Gap analysis" }
+    ];
+
+    if (selectedTool) {
+        return (
+            <motion.section
+                key="tool-view"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                    <button className="back-btn" onClick={() => setSelectedTool(null)} style={{ margin: 0 }}>
+                        <ChevronLeft size={18} /> Back
+                    </button>
+                    <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
+                        <selectedTool.icon size={18} />
+                        Generating {selectedTool.title}
+                    </div>
+                </div>
+
+                <div className="subject-hero">
+                    <h1>Select a Chapter</h1>
+                    <p>Choose a chapter to generate {selectedTool.title.toLowerCase()} for.</p>
+                </div>
+
+                <div className="book-selection-list">
+                    {subject.books.map((book) => (
+                        <motion.div
+                            key={book.book_id}
+                            className="book-select-card"
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            onClick={() => onStartBook(book, selectedTool.id)}
+                            style={{ borderLeft: '4px solid var(--primary)' }}
+                        >
+                            <div className="book-select-info">
+                                <div className="book-select-icon"><FileText size={20} /></div>
+                                <div>
+                                    <h4>{book.file_name}</h4>
+                                    <p>Ready for {selectedTool.title}</p>
+                                </div>
+                            </div>
+                            <div className="book-select-action">
+                                <span>Generate</span>
+                                <ChevronRight size={16} />
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            </motion.section>
+        );
+    }
+
     return (
         <motion.section
             key="subject-home"
@@ -251,7 +306,7 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
                             className="book-select-card"
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
-                            onClick={() => onStartBook(book)}
+                            onClick={() => onStartBook(book, 'chat')}
                         >
                             <div className="book-select-info">
                                 <div className="book-select-icon">
@@ -274,20 +329,28 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
             <h3 className="section-title">Study Tools</h3>
 
             <div className="tool-grid">
-                <Tool icon={Brain} title="AI Quiz" desc="Test understanding" />
-                <Tool icon={FileText} title="Flashcards" desc="Key concepts" />
-                <Tool icon={Mic} title="Oral Test" desc="Speak answers" />
-                <Tool icon={BookOpen} title="Summaries" desc="Chapter notes" />
+                {tools.map(tool => (
+                    <Tool
+                        key={tool.id}
+                        icon={tool.icon}
+                        title={tool.title}
+                        desc={tool.desc}
+                        onClick={() => setSelectedTool(tool)}
+                    />
+                ))}
             </div>
         </motion.section>
     );
 };
 
-const Tool = ({ icon: Icon, title, desc }) => (
+const Tool = ({ icon: Icon, title, desc, onClick }) => (
     <motion.div
         className="tool-card"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
+        onClick={onClick}
+        style={{ cursor: 'pointer' }}
+        whileHover={{ y: -4, boxShadow: "0 12px 24px rgba(0,0,0,0.08)" }}
     >
         <div className="tool-icon">
             <Icon size={22} />
