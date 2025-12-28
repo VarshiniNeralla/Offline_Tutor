@@ -55,7 +55,7 @@ const LandingPage = () => {
         <div className="hero-grid">
           <div className="hero-text">
             <h1>Your personal <br /><span className="gradient-text">AI study space</span></h1>
-            <p>Study calmly. Ask questions. Practice deeply. Everything works offline, right in your local environment.</p>
+            <p>Where focused study meets intelligent practice.</p>
             <button className="btn-primary" onClick={() => navigate('/student/login')}>
               Start Learning Now <ArrowRight size={20} />
             </button>

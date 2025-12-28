@@ -12,7 +12,8 @@ import {
     Brain,
     FileText,
     Mic,
-    Clock
+    Clock,
+    AlertCircle
 } from "lucide-react";
 
 import "../assets/styles/student-dashboard.css";
@@ -138,34 +139,64 @@ const StudentDashboard = () => {
                                 </div>
                             </div>
 
-                            <div className="subject-grid">
-                                {subjects.map((sub, idx) => (
-                                    <motion.div
-                                        key={sub.name}
-                                        className="subject-card"
-                                        initial={{ opacity: 0, y: 16 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: idx * 0.08 }}
-                                        onClick={() => setActiveSubject(sub)}
-                                    >
-                                        <div className="subject-icon">
-                                            <BookOpen size={26} />
-                                        </div>
+                            {subjects.length === 0 ? (
+                                <div className="empty-state-large" style={{
+                                    padding: "60px 20px",
+                                    textAlign: "center",
+                                    background: "white",
+                                    borderRadius: "16px",
+                                    border: "1px solid var(--border)",
+                                    color: "var(--text-muted)",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    gap: "16px"
+                                }}>
+                                    <div style={{
+                                        width: "60px",
+                                        height: "60px",
+                                        background: "var(--primary-soft)",
+                                        borderRadius: "50%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        color: "var(--primary)"
+                                    }}>
+                                        <Clock size={32} />
+                                    </div>
+                                    <h3 style={{ margin: 0, color: "var(--text-main)", fontSize: "1.1rem" }}>No subjects added yet</h3>
+                                    <p style={{ margin: 0, maxWidth: "300px" }}>They will be uploaded soon.</p>
+                                </div>
+                            ) : (
+                                <div className="subject-grid">
+                                    {subjects.map((sub, idx) => (
+                                        <motion.div
+                                            key={sub.name}
+                                            className="subject-card"
+                                            initial={{ opacity: 0, y: 16 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: idx * 0.08 }}
+                                            onClick={() => setActiveSubject(sub)}
+                                        >
+                                            <div className="subject-icon">
+                                                <BookOpen size={26} />
+                                            </div>
 
-                                        <h3>{sub.name}</h3>
+                                            <h3>{sub.name}</h3>
 
-                                        <div className="subject-meta">
-                                            <span>{sub.pages} pages</span>
-                                            <span>•</span>
-                                            <span>{sub.chunks} blocks</span>
-                                        </div>
+                                            <div className="subject-meta">
+                                                <span>{sub.pages} pages</span>
+                                                <span>•</span>
+                                                <span>{sub.chunks} blocks</span>
+                                            </div>
 
-                                        <div className="subject-cta">
-                                            Open subject <ChevronRight size={16} />
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </div>
+                                            <div className="subject-cta">
+                                                Open subject <ChevronRight size={16} />
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            )}
                         </motion.section>
                     ) : (
                         <SubjectHome
