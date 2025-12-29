@@ -7,3 +7,4 @@ textbook_metadata.json
 node_modules
 env.bat
 .env.example
+notes.txt

@@ -626,11 +626,161 @@ and respond in English.
                 
         return f"❌ All AI models failed. Last error: {last_error}"
     
-    def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
+    def generate_quiz_response(self, question: str, selected_subjects: list, selected_books: list):
+        """Generate strictly formatted JSON quiz"""
+        print(f"🧩 Generating Quiz: {question}")
+        
+        # 1. Check if vectorstore exists
+        if not self.vectorstore:
+            print("⚠️ No vectorstore available - cannot generate quiz from textbooks")
+            return '{"error": "No textbooks loaded. Please upload textbooks first."}', [], "quiz"
+        
+        # 2. Broad Context Search
+        filter_dict = None
+        if selected_books:
+            filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects:
+            filter_dict = {"subject": {"$in": selected_subjects}}
+            
+        try:
+            relevant_docs = self.vectorstore.similarity_search(
+                question, 
+                k=4, 
+                filter=filter_dict
+            )
+            context = "\n\n".join([doc.page_content for doc in relevant_docs])[:2500]
+        except Exception as e:
+            print(f"⚠️ Quiz context search failed: {e}")
+            context = "No specific textbook context found."
+
+        # 3. Robust Prompt for Code-Block JSON with Verification Logic
+        prompt = f"""You are an elite Quiz Expert. Generate a logical 5-question quiz in JSON format.
+
+CONTEXT:
+{context}
+
+RULES:
+- CLEAN OPTIONS: Provide only answer text. NO "A)", "B.", or "1)" prefixes.
+- MUTUAL EXCLUSIVITY: Options must be distinct. Only ONE option must be true.
+- REASONING FIRST: Write the "explanation" FIRST to confirm the facts, then pick the correct numerical index.
+- NO FILLER: Do NOT use example text from the schema below. Create original, contextual options.
+- Schema: [{{"id": 1, "question": "Example?", "options": ["Option A", "Option B", "Option C", "Option D"], "explanation": "Fact.", "correct_index": 0}}]
+
+JSON OUTPUT:"""
+
+        # 4. Call LLM (Locked temperature for maximum accuracy)
+        print(f"🧩 Sending quiz request to AI ({self.model_name})...")
+        quiz_start = time.time()
+        response = self.call_llama_optimized(prompt, num_predict=2500, temperature=0.0)
+        quiz_duration = time.time() - quiz_start
+        print(f"⏱️ Quiz generation completed in {quiz_duration:.2f}s")
+        
+        # 5. Robust Post-processing
+        try:
+            # Extract JSON from code block
+            clean_json = response
+            if "```json" in response:
+                clean_json = response.split("```json")[1].split("```")[0].strip()
+            elif "```" in response:
+                clean_json = response.split("```")[1].split("```")[0].strip()
+            
+            json_data = json.loads(clean_json) 
+            
+            if isinstance(json_data, dict):
+                json_data = json_data.get("quiz", json_data.get("questions", [json_data]))
+            
+            # Validate and filter with extreme leniency
+            valid_questions = []
+            if not isinstance(json_data, list):
+                # Check for "quiz" or "questions" wrappers
+                if isinstance(json_data, dict):
+                    found_list = json_data.get("quiz", json_data.get("questions", json_data.get("data", [])))
+                    if isinstance(found_list, list):
+                        json_data = found_list
+                    else:
+                        json_data = [json_data]
+                else:
+                    json_data = []
+
+            for i, q in enumerate(json_data):
+                if not isinstance(q, dict): continue
+                
+                # Lenient key matching for small models
+                question_text = q.get("question", q.get("text", q.get("q", "")))
+                options = q.get("options", q.get("choices", q.get("answers", [])))
+                correct_idx = q.get("correct_index", q.get("answer_index", q.get("correct", 0)))
+                explanation = q.get("explanation", q.get("reason", q.get("reasoning", "Fact-based explanation.")))
+
+                if not question_text:
+                    print(f"⚠️ Question {i} discarded: No question text found.")
+                    continue
+                
+                # Final check for valid options
+                if not isinstance(options, list) or len(options) < 2:
+                    print(f"⚠️ Question {i} discarded: Options invalid or too few ({len(options) if isinstance(options, list) else 'type: '+str(type(options))})")
+                    continue
+                
+                valid_questions.append({
+                    "id": len(valid_questions) + 1,
+                    "question": question_text,
+                    "options": options[:4], # Keep max 4 for UI
+                    "correct_index": int(correct_idx) if str(correct_idx).isdigit() else 0,
+                    "explanation": explanation
+                })
+            
+            if not valid_questions:
+                print(f"❌ Failed to extract any valid questions from AI output.")
+                print(f"📄 Full Cleaned JSON: {json.dumps(json_data)[:400]}")
+                raise ValueError("No valid questions found.")
+
+            print(f"✅ Successfully validated {len(valid_questions)} questions.")
+            return json.dumps(valid_questions), [], "quiz"
+            
+        except Exception as e:
+            print(f"❌ Quiz parsing failed: {e}")
+            print(f"📄 Raw response preview: {response[:300]}...")
+            return '{"error": "AI response was malformed. Please try again."}', [], "quiz"
+
+    def call_llama_optimized(self, prompt: str, num_predict: int = 1500, temperature: float = 0.7, format: str = None) -> str:
+        """Specialized LLM call for structured data generation."""
+        try:
+            payload = {
+                "model": self.model_name,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": num_predict,
+                    "num_ctx": 4096
+                }
+            }
+            if format:
+                payload["format"] = format
+
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json=payload,
+                timeout=450 
+            )
+            if response.status_code == 200:
+                # Basic cleaning of leading/trailing junk
+                text = response.json()['response'].strip()
+                return text
+        except Exception as e:
+            pass
+        return ""
+
+    def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None, mode: str = None):
         """SMART response routing with book-level scoping and intent-based optimization."""
         print(f"🧠 Processing question: {question[:50]}...")
+        
+        # STEP 0: Check for Quiz Mode
+        if mode == "quiz":
+            return self.generate_quiz_response(question, selected_subjects, selected_books)
+
         # STEP 1: Detect Intent (Brevity vs Elaboration)
-        mode = self.detect_brevity_intent(question)
+        if not mode:
+            mode = self.detect_brevity_intent(question)
         
         # STEP 2: Check if it's general conversation (no textbook search needed)
         if self.is_general_conversation(question):

@@ -187,17 +187,30 @@ const StudentDashboard = () => {
                         <SubjectHome
                             subject={activeSubject}
                             onBack={() => setActiveSubject(null)}
-                            onStartBook={(book, toolType = 'chat') =>
-                                navigate("/chat", {
-                                    state: {
-                                        subject: activeSubject.name,
-                                        class: studentClass,
-                                        bookId: book.book_id,
-                                        bookName: book.file_name,
-                                        initTool: toolType
-                                    }
-                                })
-                            }
+
+                            onStartBook={(book, toolType = 'chat') => {
+                                if (toolType === 'quiz') {
+                                    navigate("/quiz", {
+                                        state: {
+                                            subject: activeSubject.name,
+                                            class: studentClass,
+                                            bookId: book.book_id,
+                                            bookName: book.file_name,
+                                            toolType
+                                        }
+                                    });
+                                } else {
+                                    navigate("/chat", {
+                                        state: {
+                                            subject: activeSubject.name,
+                                            class: studentClass,
+                                            bookId: book.book_id,
+                                            bookName: book.file_name,
+                                            initTool: toolType
+                                        }
+                                    });
+                                }
+                            }}
                         />
                     )}
                 </AnimatePresence>
@@ -215,13 +228,13 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
         { id: 'oral', icon: Mic, title: "Oral Test", desc: "Speak answers" },
         { id: 'summary', icon: BookOpen, title: "Summaries", desc: "Chapter notes" },
         { id: 'mindmap', icon: Users, title: "Mind Maps", desc: "Visualize connections" },
-        { id: 'match', icon: Grid, title: "Match It", desc: "Concept definitions" },
+        // { id: 'match', icon: Grid, title: "Match It", desc: "Concept definitions" },
         { id: 'truefalse', icon: CheckSquare, title: "True/False", desc: "Fact checking" },
         { id: 'revision', icon: Layout, title: "One Page", desc: "Revision Sheet" },
         { id: 'keywords', icon: Search, title: "Keywords", desc: "Term explorer" },
-        { id: 'compare', icon: Scale, title: "Compare", desc: "Side by side" },
-        { id: 'doubt', icon: HelpCircle, title: "Doubt", desc: "Detector" },
-        { id: 'missed', icon: ListChecks, title: "Missed?", desc: "Gap analysis" }
+        // { id: 'compare', icon: Scale, title: "Compare", desc: "Side by side" },
+        // { id: 'doubt', icon: HelpCircle, title: "Doubt", desc: "Detector" },
+        // { id: 'missed', icon: ListChecks, title: "Missed?", desc: "Gap analysis" }
     ];
 
     if (selectedTool) {

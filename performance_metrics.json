@@ -26,5 +26,26 @@
     "tokens": 171,
     "time": 29.77,
     "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-28 14:42:30",
+    "mode": "standard",
+    "tokens": 600,
+    "time": 220.15,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-29 20:17:33",
+    "mode": "standard",
+    "tokens": 441,
+    "time": 301.57,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-29 20:24:08",
+    "mode": "standard",
+    "tokens": 806,
+    "time": 282.94,
+    "model": "phi3:latest"
   }
 ]

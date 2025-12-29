@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "mode": "quiz",
+  "duration": 160.00994396209717,
+  "response": [
+    {
+      "id": 1,
+      "question": "Which ocean is the largest?",
+      "options": [
+        "Pacific Ocean",
+        "Atlantic Ocean",
+        "Indian Ocean",
+        "Arctic Ocean"
+      ],
+      "correct_index": 0,
+      "explanation": "The Pacific Ocean covers more area than any other ocean and has greater depths, making it by far the world's largest."
+    }
+  ],
+  "logs": [
+    "\ud83d\ude80 Initializing Backend for Debug...",
+    "\n--------------------------",
+    "\ud83e\udde9 Testing generate_quiz_response...",
+    "\n\u2705 Success! Mode: quiz",
+    "\u23f1\ufe0f Duration: 160.01s"
+  ]
+}

@@ -51,6 +51,7 @@ class ChatRequest(BaseModel):
     subjects: List[str]
     book_ids: Optional[List[str]] = None
     language: str
+    mode: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -79,28 +80,39 @@ async def get_status():
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
+    print(f"📥 Received /api/chat request: mode={request.mode}, message={request.message[:50]}")
+    
     if not tutor_backend:
         raise HTTPException(status_code=503, detail="System initializing")
     
-    # Switch language if needed (this might need optimization to avoid reloading heavy models)
-    if tutor_backend.language != request.language:
-        print(f"🔄 Switching language to {request.language}")
-        tutor_backend.language = request.language
-        if request.language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
-             tutor_backend.setup_telugu_asr_offline()
-        tutor_backend.setup_offline_tts()
+    try:
+        # Switch language if needed (this might need optimization to avoid reloading heavy models)
+        if tutor_backend.language != request.language:
+            print(f"🔄 Switching language to {request.language}")
+            tutor_backend.language = request.language
+            if request.language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
+                 tutor_backend.setup_telugu_asr_offline()
+            tutor_backend.setup_offline_tts()
 
-    response_text, sources, mode = tutor_backend.get_response(
-        request.message, 
-        selected_subjects=request.subjects,
-        selected_books=request.book_ids
-    )
-    
-    return {
-        "response": response_text,
-        "sources": sources,
-        "mode": mode
-    }
+        print(f"🔄 Calling tutor_backend.get_response with mode={request.mode}")
+        response_text, sources, mode = tutor_backend.get_response(
+            request.message, 
+            selected_subjects=request.subjects,
+            selected_books=request.book_ids,
+            mode=request.mode
+        )
+        
+        print(f"✅ Got response, mode={mode}, response length={len(response_text)}")
+        return {
+            "response": response_text,
+            "sources": sources,
+            "mode": mode
+        }
+    except Exception as e:
+        import traceback
+        print("❌ ERROR IN /api/chat:")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stats")
 async def get_stats():
