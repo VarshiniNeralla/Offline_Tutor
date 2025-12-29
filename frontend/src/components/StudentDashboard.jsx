@@ -189,23 +189,22 @@ const StudentDashboard = () => {
                             onBack={() => setActiveSubject(null)}
 
                             onStartBook={(book, toolType = 'chat') => {
+                                const toolState = {
+                                    subject: activeSubject.name,
+                                    class: studentClass,
+                                    bookId: book.book_id,
+                                    bookName: book.file_name,
+                                    toolType
+                                };
+
                                 if (toolType === 'quiz') {
-                                    navigate("/quiz", {
-                                        state: {
-                                            subject: activeSubject.name,
-                                            class: studentClass,
-                                            bookId: book.book_id,
-                                            bookName: book.file_name,
-                                            toolType
-                                        }
-                                    });
+                                    navigate("/quiz", { state: toolState });
+                                } else if (toolType === 'summary') {
+                                    navigate("/summary", { state: toolState });
                                 } else {
                                     navigate("/chat", {
                                         state: {
-                                            subject: activeSubject.name,
-                                            class: studentClass,
-                                            bookId: book.book_id,
-                                            bookName: book.file_name,
+                                            ...toolState,
                                             initTool: toolType
                                         }
                                     });

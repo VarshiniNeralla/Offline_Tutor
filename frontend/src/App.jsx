@@ -10,6 +10,7 @@ import ChatInterface from './components/ChatInterface';
 import AdminDashboard from './components/AdminDashboard';
 
 import QuizTool from './components/tools/QuizTool';
+import SummaryTool from './components/tools/SummaryTool';
 
 // Wrapper for AnimatePresence to work with Routes
 const AnimatedRoutes = () => {
@@ -23,6 +24,7 @@ const AnimatedRoutes = () => {
                 <Route path="/student/dashboard" element={<StudentDashboard />} />
                 <Route path="/chat" element={<ChatInterface />} />
                 <Route path="/quiz" element={<QuizTool />} />
+                <Route path="/summary" element={<SummaryTool />} />
                 <Route path="/teacher" element={<AdminDashboard />} />
             </Routes>
         </AnimatePresence>

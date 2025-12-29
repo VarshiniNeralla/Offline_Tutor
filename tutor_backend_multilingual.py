@@ -770,13 +770,85 @@ JSON OUTPUT:"""
             pass
         return ""
 
+    def generate_summary_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
+        """Generates a structured, comprehensive summary of textbook content."""
+        if not self.vectorstore:
+            return "This textbook does not contain readable text to summarize.", [], "summary"
+
+        # 1. Scope search by book/subject
+        filter_dict = {}
+        if selected_books:
+            filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects:
+            filter_dict = {"subject": {"$in": selected_subjects}}
+            
+        try:
+            # High-density retrieval for summary
+            relevant_docs = self.vectorstore.similarity_search(
+                question, 
+                k=10, # Get more chunks for a full summary
+                filter=filter_dict
+            )
+            if not relevant_docs:
+                return "This textbook does not contain readable text to summarize.", [], "summary"
+                
+            context = "\n\n".join([doc.page_content for doc in relevant_docs])[:4000]
+        except Exception as e:
+            print(f"⚠️ Summary context search failed: {e}")
+            return "This textbook does not contain readable text to summarize.", [], "summary"
+
+        # 2. Craft Prompt for Structured Summary
+        # Use simple markers rather than complex markdown to ensure local logic is stable
+        prompt = f"""You are a Content Strategist & Educator. Provide a structured, concise summary of the following content.
+
+STRUCTURE:
+1. Title: Create a professional title based on the book or chapter.
+2. Overview: A 3-4 sentence paragraph explanation of the content.
+3. Section Breakdown: Use clear Headings. Summarize major topics with paragraphs and bullet points.
+4. Key Takeaways: 5-8 major bullet points.
+5. Important Terms: List key terms with 1-line definitions.
+
+RULES:
+- Language must be simple and student-friendly.
+- No markdown tables. Use headings (###) and lists (-).
+- Explain all jargon.
+- Do NOT hallucinate content outside the provided text.
+
+CONTENT:
+{context}
+
+SUMMARY OUTPUT:"""
+
+        print(f"📝 Generating summary for book(s): {selected_books or selected_subjects}...")
+        start_time = time.time()
+        
+        # Call LLM with zero temperature for absolute determinism as requested
+        response = self.call_llama_optimized(prompt, num_predict=2000, temperature=0.0)
+        
+        duration = time.time() - start_time
+        
+        # Standardized logging as per requirements
+        book_id_log = selected_books[0] if selected_books else "multiple"
+        print(f"[SUMMARY] bookId={book_id_log} chunks={len(relevant_docs)} duration={duration:.2f}s")
+
+        # Max Length Guard (12,000 characters)
+        if len(response) > 12000:
+            response = response[:11950] + "\n\n[This summary has been shortened for readability.]"
+
+        if not response.strip():
+            return "Unable to generate summary right now. Please try again.", [], "summary"
+
+        return response, [], "summary"
+
     def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None, mode: str = None):
         """SMART response routing with book-level scoping and intent-based optimization."""
         print(f"🧠 Processing question: {question[:50]}...")
         
-        # STEP 0: Check for Quiz Mode
+        # STEP 0: Check for Special Modes
         if mode == "quiz":
             return self.generate_quiz_response(question, selected_subjects, selected_books)
+        if mode == "summary":
+            return self.generate_summary_response(question, selected_subjects, selected_books)
 
         # STEP 1: Detect Intent (Brevity vs Elaboration)
         if not mode:

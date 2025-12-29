@@ -51,6 +51,30 @@ const AdminDashboard = () => {
     const [renamingId, setRenamingId] = useState(null);
     const [renameValue, setRenameValue] = useState("");
 
+    // Helper to check summary status from localStorage
+    const getSummaryStatus = (bookId) => {
+        const key = `summary_history_${bookId}_v2`;
+        const data = localStorage.getItem(key);
+        if (!data) return { label: "Generate AI Summary", color: "var(--primary)", dot: false };
+
+        try {
+            const history = JSON.parse(data);
+            if (!history || history.length === 0) return { label: "Generate AI Summary", color: "var(--primary)", dot: false };
+
+            // Check for teacher version
+            const hasTeacher = history.some(h => h.type === 'teacher' && !h.deleted_at);
+            if (hasTeacher) return { label: "View Summary", color: "#059669", dot: false }; // Green
+
+            // Check for student version
+            const hasStudent = history.some(h => h.type === 'student' && !h.deleted_at);
+            if (hasStudent) return { label: "Review Student Draft", color: "#d97706", dot: true }; // Orange + Dot
+
+            return { label: "Manage Summary", color: "var(--primary)", dot: false };
+        } catch {
+            return { label: "Generate AI Summary", color: "var(--primary)", dot: false };
+        }
+    };
+
     useEffect(() => {
         fetchTextbooks();
     }, []);
@@ -299,12 +323,59 @@ const AdminDashboard = () => {
                                         ) : (
                                             <div className="name-box">
                                                 <span className="book-name">{book.file_name}</span>
-                                                <span className="book-meta">{book.pages} pages • {(book.chunks / 1000).toFixed(1)}k chunks</span>
+                                                <div className="book-meta" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span>{book.pages} pages • {(book.chunks / 1000).toFixed(1)}k chunks</span>
+                                                    <span className="sep">•</span>
+                                                    {(() => {
+                                                        const status = getSummaryStatus(book.book_id);
+                                                        return (
+                                                            <button
+                                                                className="btn-link-action"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate("/summary", {
+                                                                        state: {
+                                                                            subject: activeSubject,
+                                                                            bookId: book.book_id,
+                                                                            bookName: book.file_name,
+                                                                            role: 'teacher'
+                                                                        }
+                                                                    });
+                                                                }}
+                                                                style={{
+                                                                    background: 'none',
+                                                                    border: 'none',
+                                                                    color: status.color,
+                                                                    cursor: 'pointer',
+                                                                    padding: 0,
+                                                                    fontSize: '0.8rem',
+                                                                    fontWeight: 700,
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '6px'
+                                                                }}
+                                                            >
+                                                                {status.dot && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: status.color, display: 'inline-block' }}></span>}
+                                                                {status.label}
+                                                            </button>
+                                                        );
+                                                    })()}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
 
                                     <div className="book-actions">
+                                        <button className="action-btn" title="Manage Summary" onClick={() => navigate("/summary", {
+                                            state: {
+                                                subject: activeSubject,
+                                                bookId: book.book_id,
+                                                bookName: book.file_name,
+                                                role: 'teacher'
+                                            }
+                                        })}>
+                                            <BookOpen size={18} />
+                                        </button>
                                         <button className="action-btn" title="Open" onClick={() => openBook(book.book_id)}>
                                             <Download size={18} />
                                         </button>
@@ -319,62 +390,65 @@ const AdminDashboard = () => {
                             ))
                         )}
                     </div>
-                )}
+                )
+                }
 
-            </main>
+            </main >
 
             {/* UPLOAD MODAL */}
-            {showUploadModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h2>Upload Textbooks</h2>
-                            <button className="close-btn" onClick={() => setShowUploadModal(false)}><X size={20} /></button>
-                        </div>
-
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label>Class</label>
-                                <select value={uploadClass} onChange={(e) => setUploadClass(e.target.value)}>
-                                    {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
+            {
+                showUploadModal && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h2>Upload Textbooks</h2>
+                                <button className="close-btn" onClick={() => setShowUploadModal(false)}><X size={20} /></button>
                             </div>
 
-                            <div className="form-group">
-                                <label>Subject Name</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Physics, History"
-                                    value={uploadSubject}
-                                    onChange={(e) => setUploadSubject(e.target.value)}
-                                />
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label>Class</label>
+                                    <select value={uploadClass} onChange={(e) => setUploadClass(e.target.value)}>
+                                        {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Subject Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Physics, History"
+                                        value={uploadSubject}
+                                        onChange={(e) => setUploadSubject(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="file-drop-area" onClick={() => document.getElementById('modal-file-input').click()}>
+                                    <input
+                                        id="modal-file-input"
+                                        type="file"
+                                        hidden
+                                        multiple
+                                        accept=".pdf"
+                                        onChange={(e) => setFiles(Array.from(e.target.files))}
+                                    />
+                                    <FolderPlus size={32} className="text-indigo-400 mb-2" />
+                                    <p>Click to select PDF files</p>
+                                    {files.length > 0 && <span className="file-tag">{files.length} files selected</span>}
+                                </div>
                             </div>
 
-                            <div className="file-drop-area" onClick={() => document.getElementById('modal-file-input').click()}>
-                                <input
-                                    id="modal-file-input"
-                                    type="file"
-                                    hidden
-                                    multiple
-                                    accept=".pdf"
-                                    onChange={(e) => setFiles(Array.from(e.target.files))}
-                                />
-                                <FolderPlus size={32} className="text-indigo-400 mb-2" />
-                                <p>Click to select PDF files</p>
-                                {files.length > 0 && <span className="file-tag">{files.length} files selected</span>}
+                            <div className="modal-footer">
+                                <button className="btn-text" onClick={() => setShowUploadModal(false)}>Cancel</button>
+                                <button className="btn-primary" disabled={uploading || !files.length || !uploadSubject} onClick={handleUpload}>
+                                    {uploading ? "Uploading..." : "Upload Files"}
+                                </button>
                             </div>
-                        </div>
-
-                        <div className="modal-footer">
-                            <button className="btn-text" onClick={() => setShowUploadModal(false)}>Cancel</button>
-                            <button className="btn-primary" disabled={uploading || !files.length || !uploadSubject} onClick={handleUpload}>
-                                {uploading ? "Uploading..." : "Upload Files"}
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 
