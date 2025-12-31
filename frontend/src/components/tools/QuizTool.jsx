@@ -211,16 +211,47 @@ const QuizSetup = ({ qCount, setQCount, onStart }) => (
     </motion.div>
 );
 
-const QuizLoading = () => (
-    <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="quiz-loading"
-    >
-        <div className="scanner"></div>
-        <h3>Analyzing Textbook...</h3>
-        <p>Generating unique questions for you.</p>
-    </motion.div>
-);
+const QuizLoading = () => {
+    const [progress, setProgress] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setProgress(prev => {
+                if (prev >= 90) return 90;
+                const inc = Math.floor(Math.random() * 5) + 2;
+                return Math.min(prev + inc, 90);
+            });
+        }, 800);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="quiz-loading"
+        >
+            <div className="scanner"></div>
+            <h3>Analyzing Textbook...</h3>
+
+            {/* Progress Bar UI */}
+            <div className="progress-container-quiz" style={{ margin: '24px auto', background: '#e2e8f0', borderRadius: '10px', height: '8px', overflow: 'hidden', maxWidth: '300px' }}>
+                <div
+                    className="progress-fill-quiz"
+                    style={{
+                        width: `${progress}%`,
+                        height: '100%',
+                        background: 'var(--primary)',
+                        borderRadius: '10px',
+                        transition: 'width 0.5s ease-out'
+                    }}
+                />
+            </div>
+            <p style={{ marginTop: '-12px', marginBottom: '16px', fontWeight: 600, color: 'var(--primary)' }}>{progress}%</p>
+
+            <p>Generating unique questions for you.</p>
+        </motion.div>
+    );
+};
 
 const QuizGame = ({ questions, currentQIndex, setCurrentQIndex, userAnswers, setUserAnswers, onFinish, timeElapsed, setTimeElapsed }) => {
     const question = questions[currentQIndex];

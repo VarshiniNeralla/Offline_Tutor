@@ -223,9 +223,9 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
 
     const tools = [
         { id: 'quiz', icon: Zap, title: "AI Quiz", desc: "Test understanding" },
+        { id: 'summary', icon: BookOpen, title: "Summaries", desc: "Chapter notes" },
         { id: 'flashcards', icon: FileText, title: "Flashcards", desc: "Key concepts" },
         { id: 'oral', icon: Mic, title: "Oral Test", desc: "Speak answers" },
-        { id: 'summary', icon: BookOpen, title: "Summaries", desc: "Chapter notes" },
         { id: 'mindmap', icon: Users, title: "Mind Maps", desc: "Visualize connections" },
         // { id: 'match', icon: Grid, title: "Match It", desc: "Concept definitions" },
         { id: 'truefalse', icon: CheckSquare, title: "True/False", desc: "Fact checking" },

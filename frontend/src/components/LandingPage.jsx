@@ -176,9 +176,9 @@ const LandingPage = () => {
 
           <div className="tool-previews">
             <ToolCard icon={<MessageSquare size={24} />} title="AI Chat Tutor" benefit="Instant clarity on any topic from your textbook." />
-            <ToolCard icon={<Users size={24} />} title="Mind Maps" benefit="Visualize connections between different concepts." />
             <ToolCard icon={<FileText size={24} />} title="Chapter Summaries" benefit="Quickly grasp core concepts of every lesson." />
             <ToolCard icon={<Zap size={24} />} title="Smart Quizzes" benefit="Test your knowledge with auto-generated questions." />
+            <ToolCard icon={<Users size={24} />} title="Mind Maps" benefit="Visualize connections between different concepts." />
             {/* <ToolCard icon={<Grid size={24} />} title="Match the Following" benefit="Connect concepts with definitions interactively." /> */}
             <ToolCard icon={<CheckSquare size={24} />} title="True or False" benefit="Quick fact-checking from textbook content." />
             <ToolCard icon={<Layout size={24} />} title="One Page Revision" benefit="Condense entire chapters into single sheets." />
