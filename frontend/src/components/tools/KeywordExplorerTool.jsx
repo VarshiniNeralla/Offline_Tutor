@@ -13,7 +13,8 @@ import {
     Save,
     Trash2,
     Star,
-    ShieldCheck
+    ShieldCheck,
+    Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import '../../assets/styles/student-dashboard.css';
@@ -134,6 +135,14 @@ const KeywordExplorerTool = () => {
     };
 
     // Teacher Actions
+    const handleTermChange = (index, newTerm) => {
+        const newData = [...keywordsData];
+        newData[index].term = newTerm;
+        newData[index].editedByTeacher = true;
+        setKeywordsData(newData);
+        setUnsavedChanges(true);
+    };
+
     const handleDefinitionChange = (index, newDef) => {
         const newData = [...keywordsData];
         newData[index].definition = newDef;
@@ -159,6 +168,19 @@ const KeywordExplorerTool = () => {
             setKeywordsData(newData);
             setUnsavedChanges(true);
         }
+    };
+
+    const handleAddKeyword = () => {
+        const newKeyword = {
+            term: "New Term",
+            definition: "Enter definition...",
+            level: "Basic",
+            sections: ["General"],
+            isExamImportant: false,
+            editedByTeacher: true
+        };
+        setKeywordsData([newKeyword, ...keywordsData]);
+        setUnsavedChanges(true);
     };
 
     const handleSave = () => {
@@ -205,6 +227,13 @@ const KeywordExplorerTool = () => {
                                         Cancel
                                     </button>
                                     <button
+                                        className="secondary-btn"
+                                        onClick={handleAddKeyword}
+                                        style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center', background: '#ecfdf5', color: '#059669', borderColor: '#10b981' }}
+                                    >
+                                        <Plus size={18} /> Add Term
+                                    </button>
+                                    <button
                                         className="primary-btn"
                                         onClick={handleSave}
                                         disabled={!unsavedChanges}
@@ -241,6 +270,7 @@ const KeywordExplorerTool = () => {
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
                         isEditing={isEditing}
+                        onTermChange={handleTermChange}
                         onDefChange={handleDefinitionChange}
                         onToggleExam={handleToggleExam}
                         onDelete={handleDelete}
@@ -278,7 +308,7 @@ const ErrorView = ({ message, onRetry }) => (
     </div>
 );
 
-const KeywordContent = ({ data, viewMode, setViewMode, searchQuery, setSearchQuery, isEditing, onDefChange, onToggleExam, onDelete }) => {
+const KeywordContent = ({ data, viewMode, setViewMode, searchQuery, setSearchQuery, isEditing, onTermChange, onDefChange, onToggleExam, onDelete }) => {
     // Filter Logic
     const filtered = data.filter(k =>
         k.term.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -348,6 +378,7 @@ const KeywordContent = ({ data, viewMode, setViewMode, searchQuery, setSearchQue
                             item={item}
                             isEditing={isEditing}
                             index={data.indexOf(item)} // Pass original index
+                            onTermChange={onTermChange}
                             onDefChange={onDefChange}
                             onToggleExam={onToggleExam}
                             onDelete={onDelete}
@@ -368,6 +399,7 @@ const KeywordContent = ({ data, viewMode, setViewMode, searchQuery, setSearchQue
                                         item={item}
                                         isEditing={isEditing}
                                         index={item.originalIndex}
+                                        onTermChange={onTermChange}
                                         onDefChange={onDefChange}
                                         onToggleExam={onToggleExam}
                                         onDelete={onDelete}
@@ -382,7 +414,7 @@ const KeywordContent = ({ data, viewMode, setViewMode, searchQuery, setSearchQue
     );
 };
 
-const KeywordCard = ({ item, isEditing, index, onDefChange, onToggleExam, onDelete }) => {
+const KeywordCard = ({ item, isEditing, index, onTermChange, onDefChange, onToggleExam, onDelete }) => {
     // Badges
     const levelColors = {
         'Basic': { bg: '#dcfce7', text: '#166534' },
@@ -402,7 +434,17 @@ const KeywordCard = ({ item, isEditing, index, onDefChange, onToggleExam, onDele
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--text-main)' }}>{item.term}</h3>
+                {isEditing ? (
+                    <input
+                        type="text"
+                        value={item.term}
+                        onChange={(e) => onTermChange(index, e.target.value)}
+                        placeholder="Keyword name..."
+                        style={{ fontSize: '1.2rem', fontWeight: 600, padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', width: '60%' }}
+                    />
+                ) : (
+                    <h3 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--text-main)' }}>{item.term}</h3>
+                )}
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                     {item.editedByTeacher && !isEditing && (

@@ -96,5 +96,26 @@
     "tokens": 340,
     "time": 156.8,
     "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2026-01-01 11:57:16",
+    "mode": "brief",
+    "tokens": 436,
+    "time": 150.23,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2026-01-01 12:00:56",
+    "mode": "brief",
+    "tokens": 192,
+    "time": 35.58,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2026-01-01 12:02:05",
+    "mode": "brief",
+    "tokens": 336,
+    "time": 60.0,
+    "model": "phi3:latest"
   }
 ]
