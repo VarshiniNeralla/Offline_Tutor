@@ -12,7 +12,8 @@ import {
     Edit2,
     Download,
     X,
-    Check
+    Check,
+    Search
 } from "lucide-react";
 
 import "../assets/styles/admin-dashboard.css";
@@ -360,6 +361,35 @@ const AdminDashboard = () => {
                                                             </button>
                                                         );
                                                     })()}
+                                                    <span className="sep">•</span>
+                                                    <button
+                                                        className="btn-link-action"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate("/keywords", {
+                                                                state: {
+                                                                    subject: activeSubject,
+                                                                    bookId: book.book_id,
+                                                                    bookName: book.file_name,
+                                                                    role: 'teacher'
+                                                                }
+                                                            });
+                                                        }}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: '#64748b',
+                                                            cursor: 'pointer',
+                                                            padding: 0,
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 700,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px'
+                                                        }}
+                                                    >
+                                                        <Search size={14} /> Keywords
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}

@@ -214,6 +214,47 @@ class AITextbookTutorMultilingualBackendOffline:
             print(f"❌ Transcription error: {e}")
             return f"❌ Transcription error: {str(e)}"
 
+    def generate_keywords_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
+        """Generates a structured list of keywords from the provided scope."""
+        if not self.vectorstore:
+            return '{"keywords": []}', [], "keywords"
+
+        # 1. Scope search by book/subject
+        filter_dict = {}
+        if selected_books:
+            filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects:
+            filter_dict = {"subject": {"$in": selected_subjects}}
+            
+        try:
+            # High-density retrieval for keywords
+            relevant_docs = self.vectorstore.similarity_search(
+                question, 
+                k=5, # Further reduced to stay safely within token limits
+                filter=filter_dict
+            )
+            
+            if not relevant_docs:
+                return '{"keywords": []}', [], "keywords"
+
+            # 2. Prepare Context
+            context_text = "\n\n".join([doc.page_content for doc in relevant_docs])
+            sources = [doc.metadata.get('source', 'Unknown') for doc in relevant_docs]
+
+            # 3. Call Keyword Prompt
+            # Pass to chat_with_textbook_context which now handles 'keywords' mode
+            response_text = self.chat_with_textbook_context(question, context_text, mode="keywords")
+            
+            # Double check JSON-like string
+            if not response_text.strip().startswith('{'):
+                 return '{"keywords": []}', sources, "keywords"
+
+            return response_text, sources, "keywords"
+            
+        except Exception as e:
+            print(f"❌ Keyword generation failed: {e}")
+            return '{"keywords": []}', [], "keywords"
+
         
     def speak_text(self, text: str):
         """OFFLINE text-to-speech generation"""
@@ -441,6 +482,41 @@ class AITextbookTutorMultilingualBackendOffline:
 
     def chat_with_textbook_context(self, question: str, context: str, mode: str = "standard") -> str:
         """AI response with textbook context - DYNAMIC MODE SUPPORT"""
+        
+        # KEYWORDS MODE: Special Handling
+        if mode == "keywords":
+            if not self.llm_available:
+                return '{"keywords": []}'
+            
+            # Ultra-fast extraction prompt for local models
+            prompt = f"""[INST] Extract 5 keywords from this text.
+Text: {context[:2000]}
+Output ONLY valid JSON:
+{{
+  "keywords": [
+    {{
+      "term": "Term",
+      "definition": "Meaning",
+      "level": "Basic",
+      "sections": ["Section"]
+    }}
+  ]
+}} [/INST]"""
+            # Use standard fast call (NOT JSON mode which is slow on cpu/local)
+            response = self.call_llama(prompt, mode="brief", num_predict=1000, timeout=180)
+            
+            # Extract JSON from potential conversational filler
+            import re
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                response = json_match.group(0)
+            
+            if not response.strip().startswith('{'):
+                print(f"⚠️ Keyword AI failed. Raw: {response[:100]}")
+                return '{"keywords": []}'
+            
+            return response
+
         if not self.llm_available:
             if self.language == 'telugu':
                 return f"పాఠ్యపుస్తక సమాచారం:\n\n{context}\n\nమరింత వివరాలు కావాలంటే దయచేసి నిర్దిష్ట ప్రశ్న అడగండి."
@@ -741,7 +817,7 @@ JSON OUTPUT:"""
             print(f"📄 Raw response preview: {response[:300]}...")
             return '{"error": "AI response was malformed. Please try again."}', [], "quiz"
 
-    def call_llama_optimized(self, prompt: str, num_predict: int = 1500, temperature: float = 0.7, format: str = None) -> str:
+    def call_llama_optimized(self, prompt: str, num_predict: int = 1500, temperature: float = 0.1, format: str = None) -> str:
         """Specialized LLM call for structured data generation."""
         try:
             payload = {
@@ -751,7 +827,7 @@ JSON OUTPUT:"""
                 "options": {
                     "temperature": temperature,
                     "num_predict": num_predict,
-                    "num_ctx": 4096
+                    "num_ctx": 8192 # Increased for higher safety margin
                 }
             }
             if format:
@@ -763,11 +839,14 @@ JSON OUTPUT:"""
                 timeout=450 
             )
             if response.status_code == 200:
-                # Basic cleaning of leading/trailing junk
                 text = response.json()['response'].strip()
+                if not text:
+                    print(f"⚠️ Ollama returned empty response for model {self.model_name}")
                 return text
+            else:
+                print(f"❌ Ollama Error: {response.status_code} - {response.text}")
         except Exception as e:
-            pass
+            print(f"❌ call_llama_optimized Exception: {e}")
         return ""
 
     def generate_summary_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
@@ -849,6 +928,8 @@ SUMMARY OUTPUT:"""
             return self.generate_quiz_response(question, selected_subjects, selected_books)
         if mode == "summary":
             return self.generate_summary_response(question, selected_subjects, selected_books)
+        if mode == "keywords":
+            return self.generate_keywords_response(question, selected_subjects, selected_books)
 
         # STEP 1: Detect Intent (Brevity vs Elaboration)
         if not mode:

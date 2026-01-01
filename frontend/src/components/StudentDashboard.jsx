@@ -63,7 +63,12 @@ const StudentDashboard = () => {
 
         try {
             const res = await fetch("/api/textbooks");
-            const data = await res.json();
+            if (!res.ok) throw new Error("Server error");
+
+            const text = await res.text();
+            if (!text) throw new Error("Empty response");
+
+            const data = JSON.parse(text);
             const allBooks = Object.values(data);
             const classBooks = allBooks.filter(b => b.class_name === cls);
             const grouped = classBooks.reduce((acc, book) => {
@@ -201,6 +206,8 @@ const StudentDashboard = () => {
                                     navigate("/quiz", { state: toolState });
                                 } else if (toolType === 'summary') {
                                     navigate("/summary", { state: toolState });
+                                } else if (toolType === 'keywords') {
+                                    navigate("/keywords", { state: toolState });
                                 } else {
                                     navigate("/chat", {
                                         state: {

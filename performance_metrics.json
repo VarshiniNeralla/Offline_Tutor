@@ -47,5 +47,54 @@
     "tokens": 806,
     "time": 282.94,
     "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-31 23:08:50",
+    "mode": "standard",
+    "tokens": 186,
+    "time": 191.14,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-31 23:16:58",
+    "mode": "standard",
+    "tokens": 330,
+    "time": 184.52,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-31 23:24:46",
+    "mode": "standard",
+    "tokens": 159,
+    "time": 119.61,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-31 23:25:18",
+    "mode": "standard",
+    "tokens": 189,
+    "time": 152.35,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-31 23:25:56",
+    "mode": "standard",
+    "tokens": 202,
+    "time": 182.75,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-31 23:26:41",
+    "mode": "standard",
+    "tokens": 245,
+    "time": 228.34,
+    "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2025-12-31 23:48:34",
+    "mode": "brief",
+    "tokens": 340,
+    "time": 156.8,
+    "model": "phi3:latest"
   }
 ]

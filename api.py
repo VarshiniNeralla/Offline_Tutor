@@ -79,7 +79,7 @@ async def get_status():
     }
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest):
+def chat(request: ChatRequest):
     print(f"📥 Received /api/chat request: mode={request.mode}, message={request.message[:50]}")
     
     if not tutor_backend:
@@ -121,7 +121,7 @@ async def get_stats():
     return admin_backend.get_system_stats()
 
 @app.post("/api/upload")
-async def upload_textbook(
+def upload_textbook(
     file: UploadFile = File(...), 
     language: str = Form("english"),
     subject_name: str = Form(...),
