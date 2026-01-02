@@ -1,6 +1,6 @@
 import os
 import shutil
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -48,6 +48,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"📡 {request.method} {request.url}", flush=True)
+    response = await call_next(request)
+    return response
+
 # --- Pydantic Models ---
 class ChatRequest(BaseModel):
     message: str
@@ -94,21 +100,21 @@ async def get_status():
 
 @app.post("/api/chat")
 def chat(request: ChatRequest):
-    print(f"📥 Received /api/chat request: mode={request.mode}, message={request.message[:50]}")
+    print(f"📬 Received /api/chat request: mode={request.mode}, message={request.message[:60]}...", flush=True)
     
     if not tutor_backend:
         raise HTTPException(status_code=503, detail="System initializing")
     
     try:
         # Switch language if needed (this might need optimization to avoid reloading heavy models)
-        if tutor_backend.language != request.language:
+        if hasattr(tutor_backend, 'language') and tutor_backend.language != request.language:
             print(f"🔄 Switching language to {request.language}")
             tutor_backend.language = request.language
             if request.language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
                  tutor_backend.setup_telugu_asr_offline()
             tutor_backend.setup_offline_tts()
 
-        print(f"🔄 Calling tutor_backend.get_response with mode={request.mode}")
+        print(f"🔁 Calling tutor_backend.get_response with mode={request.mode}", flush=True)
         response_text, sources, mode = tutor_backend.get_response(
             request.message, 
             selected_subjects=request.subjects,
@@ -116,7 +122,7 @@ def chat(request: ChatRequest):
             mode=request.mode
         )
         
-        print(f"✅ Got response, mode={mode}, response length={len(response_text)}")
+        print(f"📥 Got response, mode={mode}, response length={len(response_text)}", flush=True)
         return {
             "response": response_text,
             "sources": sources,
@@ -270,4 +276,4 @@ if os.path.exists("frontend/dist"):
     app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api:app", host="127.0.0.1", port=8001, reload=False)
