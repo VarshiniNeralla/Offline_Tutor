@@ -13,6 +13,7 @@ import tempfile
 import io
 import re
 import time
+import random
 
 
 warnings.filterwarnings('ignore')
@@ -254,6 +255,49 @@ class AITextbookTutorMultilingualBackendOffline:
         except Exception as e:
             print(f"❌ Keyword generation failed: {e}")
             return '{"keywords": []}', [], "keywords"
+
+    def generate_true_false_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
+        """Generates True/False questions based on textbook context."""
+        # Selection logic similar to keywords
+        filter_dict = {}
+        if selected_books:
+            filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects:
+            filter_dict = {"subject": {"$in": selected_subjects}}
+            
+        try:
+            # Retrieve more chunks but sample them to ensure diversity
+            relevant_docs = self.vectorstore.similarity_search(
+                question, 
+                k=8, # Get a broader pool
+                filter=filter_dict
+            )
+            
+            if relevant_docs:
+                # Randomly pick subset of chunks to prevent same questions
+                sample_size = min(len(relevant_docs), 4)
+                relevant_docs = random.sample(relevant_docs, sample_size)
+            
+            if not relevant_docs:
+                try:
+                    # Fallback: Just grab ANY content from the same books/subjects if search is too specific
+                    relevant_docs = self.vectorstore.similarity_search("", k=5, filter=filter_dict)
+                    if not relevant_docs:
+                        return '{"questions": []}', [], "truefalse"
+                except:
+                    return '{"questions": []}', [], "truefalse"
+
+            context_text = "\n\n".join([doc.page_content for doc in relevant_docs])
+            sources = [doc.metadata.get('source', 'Unknown') for doc in relevant_docs]
+
+            # Call AI with truefalse mode
+            response_text = self.chat_with_textbook_context(question, context_text, mode="truefalse")
+            
+            return response_text, sources, "truefalse"
+            
+        except Exception as e:
+            print(f"❌ True/False generation failed: {e}")
+            return '{"questions": []}', [], "truefalse"
 
         
     def speak_text(self, text: str):
@@ -506,7 +550,6 @@ Output ONLY valid JSON:
             response = self.call_llama(prompt, mode="brief", num_predict=1000, timeout=180)
             
             # Extract JSON from potential conversational filler
-            import re
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 response = json_match.group(0)
@@ -516,6 +559,65 @@ Output ONLY valid JSON:
                 return '{"keywords": []}'
             
             return response
+
+        if mode == "truefalse":
+            # Extract count from question if possible (e.g., "Identify 10...")
+            count_match = re.search(r'(\d+)', question)
+            q_count = int(count_match.group(1)) if count_match else 5
+            
+            # MULTI-PASS STRATEGY: Split large counts into chunks of 5
+            # This is much more reliable on slow local CPUs than one large call
+            pass_count = (q_count + 4) // 5  # e.g., 10 -> 2 passes, 15 -> 3 passes
+            all_questions = []
+            
+            for p in range(pass_count):
+                # Slightly shift context for each pass to get variety
+                current_context_start = p * 1000
+                current_context = context[current_context_start:current_context_start+2000]
+                if not current_context.strip(): current_context = context[:2000] # Fallback
+                
+                pass_q_count = 5 if p < pass_count - 1 else q_count - (p * 5)
+                
+                prompt = f"""Extract {pass_q_count} TRUE/FALSE facts from the text as JSON.
+Text: {current_context}
+
+RULES:
+- BRIEF: Explanations MUST be under 10 words.
+- Format:
+{{
+  "questions": [
+    {{
+      "statement": "fact",
+      "answer": true/false,
+      "explanation": "why (max 8 words)",
+      "corrected_statement": "if false"
+    }}
+  ]
+}}
+JSON Output:"""
+                
+                # Faster calls with native JSON mode
+                print(f"🔄 True/False Pass {p+1}/{pass_count} for {pass_q_count} questions...")
+                # Use call_llama_optimized which has internal JSON formatting support
+                response = self.call_llama_optimized(prompt, num_predict=1200, temperature=0.1, format="json")
+                
+                json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                if json_match:
+                    try:
+                        parsed = json.loads(json_match.group(0))
+                        if "questions" in parsed:
+                            all_questions.extend(parsed["questions"])
+                    except:
+                        print(f"⚠️ Pass {p+1} failed to parse JSON.")
+            
+            if all_questions:
+                # Truncate to exact requested count if we got a few extra
+                final_questions = all_questions[:q_count]
+                return json.dumps({"questions": final_questions})
+            
+            # If we reached here, something went wrong across all passes
+            print(f"❌ True/False AI Multi-Pass Failed.")
+            return '{"questions": []}'
 
         if not self.llm_available:
             if self.language == 'telugu':
@@ -629,7 +731,7 @@ and respond in English.
         
         return self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
     
-    def call_llama(self, prompt: str, context: str = "", mode: str = "standard", num_predict: int = None, timeout: int = None) -> str:
+    def call_llama(self, prompt: str, context: str = "", mode: str = "standard", num_predict: int = None, timeout: int = None, temperature: float = 0.7, num_ctx: int = 4096) -> str:
         """Make API call to local Ollama with dynamic budgets and robustness."""
         # Pick defaults if not provided
         if num_predict is None or timeout is None:
@@ -663,9 +765,10 @@ and respond in English.
                         "prompt": prompt,
                         "stream": False,
                         "options": {
-                            "temperature": 0.7,
+                            "temperature": temperature,
                             "top_p": 0.9,
-                            "num_predict": num_predict
+                            "num_predict": num_predict,
+                            "num_ctx": num_ctx
                         }
                     },
                     timeout=timeout 
@@ -930,6 +1033,8 @@ SUMMARY OUTPUT:"""
             return self.generate_summary_response(question, selected_subjects, selected_books)
         if mode == "keywords":
             return self.generate_keywords_response(question, selected_subjects, selected_books)
+        if mode == "truefalse":
+            return self.generate_true_false_response(question, selected_subjects, selected_books)
 
         # STEP 1: Detect Intent (Brevity vs Elaboration)
         if not mode:

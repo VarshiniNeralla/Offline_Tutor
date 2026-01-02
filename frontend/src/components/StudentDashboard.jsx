@@ -208,6 +208,8 @@ const StudentDashboard = () => {
                                     navigate("/summary", { state: toolState });
                                 } else if (toolType === 'keywords') {
                                     navigate("/keywords", { state: toolState });
+                                } else if (toolType === 'truefalse') {
+                                    navigate("/truefalse", { state: toolState });
                                 } else {
                                     navigate("/chat", {
                                         state: {
@@ -231,16 +233,16 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
     const tools = [
         { id: 'quiz', icon: Zap, title: "AI Quiz", desc: "Test understanding" },
         { id: 'summary', icon: BookOpen, title: "Summaries", desc: "Chapter notes" },
+        { id: 'keywords', icon: Search, title: "Keywords", desc: "Term explorer" },
+        { id: 'truefalse', icon: CheckSquare, title: "True/False", desc: "Fact checking" },
         { id: 'flashcards', icon: FileText, title: "Flashcards", desc: "Key concepts" },
         { id: 'oral', icon: Mic, title: "Oral Test", desc: "Speak answers" },
         { id: 'mindmap', icon: Users, title: "Mind Maps", desc: "Visualize connections" },
-        // { id: 'match', icon: Grid, title: "Match It", desc: "Concept definitions" },
-        { id: 'truefalse', icon: CheckSquare, title: "True/False", desc: "Fact checking" },
         { id: 'revision', icon: Layout, title: "One Page", desc: "Revision Sheet" },
-        { id: 'keywords', icon: Search, title: "Keywords", desc: "Term explorer" },
         // { id: 'compare', icon: Scale, title: "Compare", desc: "Side by side" },
         // { id: 'doubt', icon: HelpCircle, title: "Doubt", desc: "Detector" },
         // { id: 'missed', icon: ListChecks, title: "Missed?", desc: "Gap analysis" }
+        // { id: 'match', icon: Grid, title: "Match It", desc: "Concept definitions" },
     ];
 
     if (selectedTool) {

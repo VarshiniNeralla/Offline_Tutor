@@ -12,6 +12,7 @@ import AdminDashboard from './components/AdminDashboard';
 import QuizTool from './components/tools/QuizTool';
 import SummaryTool from './components/tools/SummaryTool';
 import KeywordExplorerTool from './components/tools/KeywordExplorerTool';
+import TrueFalseTool from './components/tools/TrueFalseTool';
 
 // Wrapper for AnimatePresence to work with Routes
 const AnimatedRoutes = () => {
@@ -27,6 +28,7 @@ const AnimatedRoutes = () => {
                 <Route path="/quiz" element={<QuizTool />} />
                 <Route path="/summary" element={<SummaryTool />} />
                 <Route path="/keywords" element={<KeywordExplorerTool />} />
+                <Route path="/truefalse" element={<TrueFalseTool />} />
                 <Route path="/teacher" element={<AdminDashboard />} />
             </Routes>
         </AnimatePresence>

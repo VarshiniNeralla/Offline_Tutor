@@ -13,6 +13,7 @@ import {
     Download,
     X,
     Check,
+    CheckSquare,
     Search
 } from "lucide-react";
 
@@ -389,6 +390,35 @@ const AdminDashboard = () => {
                                                         }}
                                                     >
                                                         <Search size={14} /> Keywords
+                                                    </button>
+                                                    <span className="sep" style={{ color: '#cbd5e1', margin: '0 4px' }}>•</span>
+                                                    <button
+                                                        className="btn-link-action"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate("/truefalse", {
+                                                                state: {
+                                                                    subject: activeSubject,
+                                                                    bookId: book.book_id,
+                                                                    bookName: book.file_name,
+                                                                    role: 'teacher'
+                                                                }
+                                                            });
+                                                        }}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: '#64748b',
+                                                            cursor: 'pointer',
+                                                            padding: 0,
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 700,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px'
+                                                        }}
+                                                    >
+                                                        <CheckSquare size={14} /> Manage T/F
                                                     </button>
                                                 </div>
                                             </div>
