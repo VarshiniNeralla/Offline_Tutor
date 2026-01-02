@@ -10,32 +10,29 @@ import uvicorn
 from contextlib import asynccontextmanager
 
 # Import backend logic
-from tutor_backend_multilingual import AITextbookTutorMultilingualBackendOffline
+from tutor_backend_multilingual import AITextbookTutorMultilingualBackend
 from admin_backend import AITextbookAdminBackendOffline
-from student_progress_manager import StudentProgressManager
 
 # Global instances
 tutor_backend = None
 admin_backend = None
-progress_manager = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global tutor_backend, admin_backend, progress_manager
-    print("Starting Offline Neural Server...")
+    global tutor_backend, admin_backend
+    print("🚀 Starting Offline Neural Server...")
     
     # Initialize backends
-    tutor_backend = AITextbookTutorMultilingualBackendOffline(language='english') 
+    tutor_backend = AITextbookTutorMultilingualBackend(language='english') 
     admin_backend = AITextbookAdminBackendOffline()
-    progress_manager = StudentProgressManager()
     
     # Skip warmup - will warm on first request
-    print("Neural Core & Progress Manager ready (warmup on first request)")
+    print("✅ Neural Core ready (warmup on first request)")
         
     yield
     # Shutdown logic if needed
-    print("Shutting down Neural Server...")
+    print("👋 Shutting down Neural Server...")
 
 app = FastAPI(title="AI Tutor Offline API", lifespan=lifespan)
 
@@ -50,7 +47,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    print(f"📡 {request.method} {request.url}", flush=True)
+    print(f"📡 {request.method} {request.url}")
     response = await call_next(request)
     return response
 
@@ -77,17 +74,6 @@ class RenameRequest(BaseModel):
     book_id: str
     new_name: str
 
-class ProgressSaveRequest(BaseModel):
-    type: str # 'quiz', 'truefalse'
-    student_name: str
-    student_class: str
-    subject: str
-    book_id: str
-    book_name: str
-    score: int
-    total_questions: int
-    questions: List[dict]
-
 # --- Routes ---
 
 @app.get("/api/status")
@@ -100,7 +86,7 @@ async def get_status():
 
 @app.post("/api/chat")
 def chat(request: ChatRequest):
-    print(f"📬 Received /api/chat request: mode={request.mode}, message={request.message[:60]}...", flush=True)
+    print(f"📬 Received /api/chat request: mode={request.mode}, message={request.message[:60]}...")
     
     if not tutor_backend:
         raise HTTPException(status_code=503, detail="System initializing")
@@ -114,7 +100,7 @@ def chat(request: ChatRequest):
                  tutor_backend.setup_telugu_asr_offline()
             tutor_backend.setup_offline_tts()
 
-        print(f"🔁 Calling tutor_backend.get_response with mode={request.mode}", flush=True)
+        print(f"🔁 Calling tutor_backend.get_response with mode={request.mode}")
         response_text, sources, mode = tutor_backend.get_response(
             request.message, 
             selected_subjects=request.subjects,
@@ -122,7 +108,7 @@ def chat(request: ChatRequest):
             mode=request.mode
         )
         
-        print(f"📥 Got response, mode={mode}, response length={len(response_text)}", flush=True)
+        print(f"📥 Got response, mode={mode}, response length={len(response_text)}")
         return {
             "response": response_text,
             "sources": sources,
@@ -238,42 +224,10 @@ async def get_book_file(book_id: str):
         
     return FileResponse(file_path, media_type='application/pdf', filename=book['file_name'])
 
-# --- Progress Tracking Routes ---
-
-@app.post("/api/progress/save")
-async def save_progress(request: ProgressSaveRequest):
-    print(f"📁 Saving progress for {request.student_name}: {request.type}")
-    if not progress_manager:
-        raise HTTPException(status_code=503, detail="System initializing")
-    
-    success, result = progress_manager.save_attempt(request.dict())
-    if success:
-        return {"status": "success", "attempt_id": result}
-    raise HTTPException(status_code=500, detail=result)
-
-@app.get("/api/progress/history")
-async def get_progress_history(name: str = None, student_class: str = None):
-    print(f"📁 Fetching history for {name} ({student_class})")
-    if not progress_manager:
-        raise HTTPException(status_code=503, detail="System initializing")
-    
-    history = progress_manager.get_history(student_name=name, student_class=student_class)
-    return history
-
-@app.get("/api/progress/attempt/{attempt_id}")
-async def get_attempt(attempt_id: str):
-    if not progress_manager:
-        raise HTTPException(status_code=503, detail="System initializing")
-    
-    attempt = progress_manager.get_attempt_details(attempt_id)
-    if attempt:
-        return attempt
-    raise HTTPException(status_code=404, detail="Attempt not found")
-
 # Static Files (React Build)
 # We will check if the build folder exists and mount it
 if os.path.exists("frontend/dist"):
     app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run("api:app", host="127.0.0.1", port=8001, reload=False)
+    uvicorn.run("api:app", host="0.0.0.0", port=8001, reload=True)
