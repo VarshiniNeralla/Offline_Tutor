@@ -5,26 +5,37 @@ import uuid
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+try:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+except ImportError:
+    HuggingFaceEmbeddings = None
 from langchain_community.vectorstores import Chroma
-from langdetect import detect
+try:
+    from langdetect import detect
+except ImportError:
+    detect = None
 import requests
 
 warnings.filterwarnings('ignore')
 
 class AITextbookAdminBackendOffline:
     def __init__(self):
-        print("🚀 Initializing Offline Admin Backend...")
+        print("Initializing Offline Admin Backend...")
         self.textbooks = {} # Stored as {book_id: {metadata}}
         self.vectorstore = None
         self.setup_embeddings_offline()
         self.check_llama_offline()
         self.load_existing_data()
-        print("✅ Offline Admin Backend Ready!")
+        print("Offline Admin Backend Ready!")
     
     def setup_embeddings_offline(self):
         """Setup embeddings with offline mode"""
         print("🧠 Setting up offline embeddings...")
+        if HuggingFaceEmbeddings is None:
+            print("⚠️ HuggingFaceEmbeddings not available. RAG disabled.")
+            self.embeddings = None
+            return
+
         try:
             os.makedirs("./models/embeddings", exist_ok=True)
             os.environ['HF_HUB_OFFLINE'] = '1'
@@ -38,12 +49,12 @@ class AITextbookAdminBackendOffline:
                 )
                 print("✅ Offline embeddings loaded from cache!")
             except Exception as offline_error:
-                print(f"⚠️ Offline mode failed: {offline_error}")
-                raise Exception("Models not available offline. Run download_models.py first with internet connection.")
+                print(f"Offline mode failed: {offline_error}. RAG disabled.")
+                self.embeddings = None
                 
         except Exception as e:
-            print(f"❌ Embeddings setup failed: {e}")
-            raise e
+            print(f"Embeddings setup failed: {e}. RAG disabled.")
+            self.embeddings = None
 
     def check_llama_offline(self):
         """Check Ollama availability with memory-safe fallback order"""
@@ -148,6 +159,10 @@ class AITextbookAdminBackendOffline:
             if len(sample_text.strip()) < 50:
                 return "english", 0.5
             
+            if detect is None:
+                print("langdetect not installed. Defaulting to English.")
+                return "english", 0.5
+            
             detected_lang = detect(sample_text)
             language_map = {'te': 'telugu', 'en': 'english', 'hi': 'hindi'}
             return language_map.get(detected_lang, 'english'), 0.85
@@ -204,7 +219,7 @@ class AITextbookAdminBackendOffline:
             try:
                 pages = loader.load()
             except Exception as pdf_err:
-                print(f"❌ PDF Loading error: {pdf_err}")
+                print(f"PDF Loading error: {pdf_err}")
                 return False, f"❌ PDF Loading error: {str(pdf_err)}"
             
             if not pages:
@@ -240,7 +255,7 @@ class AITextbookAdminBackendOffline:
                 else:
                     print("➕ Adding to existing vector store...")
                     self.vectorstore.add_documents(chunks)
-                print("✅ Vector store updated successfully")
+                print("Vector store updated successfully")
             except Exception as ve:
                 print(f"❌ Vector Store Error: {ve}")
                 return False, f"❌ Database error: {str(ve)}"
@@ -259,7 +274,7 @@ class AITextbookAdminBackendOffline:
             }
             
             self.save_metadata()
-            print(f"🎉 Successfully added {subject_name} ({safe_filename})")
+            print(f"Successfully added {subject_name} ({safe_filename})")
             return True, f"✅ Added {safe_filename} to {subject_name}"
             
         except Exception as e:

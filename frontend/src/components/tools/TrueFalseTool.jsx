@@ -17,7 +17,8 @@ import {
     Plus,
     ShieldCheck,
     ChevronRight,
-    FileText
+    FileText,
+    Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import '../../assets/styles/student-dashboard.css';
@@ -27,7 +28,8 @@ const TrueFalseTool = () => {
     const navigate = useNavigate();
 
     // Context from Dashboard / Admin
-    const { subject, bookId, bookName, class: className, role = 'student' } = location.state || {};
+    const { subject, bookId, bookName: rawBookName, class: className, role = 'student' } = location.state || {};
+    const bookName = rawBookName ? rawBookName.replace(/\.pdf$/i, '') : '';
 
     // --- STATE ---
     const [view, setView] = useState('SETUP'); // SETUP, LOADING, GAME, RESULTS, ERROR
@@ -155,6 +157,46 @@ const TrueFalseTool = () => {
         }
     };
 
+    const saveProgress = async (finalQuestions, finalAnswers) => {
+        try {
+            const studentName = localStorage.getItem("studentName");
+            const studentClass = localStorage.getItem("studentClass");
+
+            let correctCount = 0;
+            const limit = Math.min(qCount, finalQuestions.length);
+            const detailedQuestions = finalQuestions.slice(0, limit).map((q, idx) => {
+                const userAns = finalAnswers[idx];
+                const isCorrect = userAns === q.answer;
+                if (isCorrect) correctCount++;
+                return {
+                    ...q,
+                    user_answer: userAns,
+                    correct_answer: q.answer
+                };
+            });
+
+            const payload = {
+                type: 'truefalse',
+                student_name: studentName,
+                student_class: studentClass,
+                subject,
+                book_id: bookId,
+                book_name: bookName,
+                score: correctCount,
+                total_questions: detailedQuestions.length,
+                questions: detailedQuestions
+            };
+
+            await fetch('/api/progress/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch (err) {
+            console.error("Save progress failed", err);
+        }
+    };
+
     const calculateResults = () => {
         let finalScore = 0;
         questions.forEach((q, idx) => {
@@ -162,6 +204,7 @@ const TrueFalseTool = () => {
         });
         setScore(finalScore);
         setView('RESULTS');
+        saveProgress(questions, userAnswers);
     };
 
     const handleRetry = () => {
@@ -263,48 +306,127 @@ const TrueFalseTool = () => {
             <main className="dashboard-container" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '60px' }}>
                 <AnimatePresence mode="wait">
                     {view === 'SETUP' && (
-                        <motion.div key="setup" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-card" style={{ padding: '32px', textAlign: 'center', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-                            <div className="setup-icon" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', padding: '16px', borderRadius: '24px', display: 'inline-block', marginBottom: '20px', boxShadow: '0 8px 16px rgba(99, 102, 241, 0.2)' }}>
-                                <FileText size={40} color="white" />
+                        <motion.div key="setup" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-card" style={{ padding: '28px', textAlign: 'left', border: '1px solid #e0e7ff', maxWidth: '500px', margin: '75px auto 0', boxShadow: '0 20px 40px -10px rgba(99, 102, 241, 0.15)', borderRadius: '24px' }}>
+                            {/* Vibrant Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                    <div style={{ padding: '10px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: '14px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)' }}>
+                                        <Target size={22} color="white" />
+                                    </div>
+                                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, background: 'linear-gradient(90deg, #1e293b, #4f46e5)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                                        True/False
+                                    </h2>
+                                </div>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4f46e5', background: '#e0e7ff', padding: '6px 12px', borderRadius: '20px', letterSpacing: '0.5px' }}>
+                                    {bookName}
+                                </span>
                             </div>
-                            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '8px', background: 'linear-gradient(90deg, #1e293b, #6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                                Fact-Check Challenge
-                            </h2>
-                            <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '1rem', fontWeight: 500 }}>
-                                Master the core concepts of <strong>{bookName}</strong>
-                            </p>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '400px', margin: '0 auto' }}>
-                                <div style={{ textAlign: 'left' }}>
-                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '12px', fontSize: '0.9rem' }}>QUESTIONS</label>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                            {/* Pill Grid Controls */}
+                            <div style={{ display: 'grid', gap: '24px', marginBottom: '32px' }}>
+                                {/* Row 1: Question Count */}
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>Mission Length</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
                                         {[5, 10, 15].map(n => (
-                                            <button key={n} onClick={() => setQCount(n)} className={qCount === n ? 'count-btn active' : 'count-btn'} style={{ padding: '8px' }}>
-                                                {n} Qs
+                                            <button
+                                                key={n}
+                                                onClick={() => setQCount(n)}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '10px',
+                                                    borderRadius: '50px', // Pill Shape
+                                                    border: 'none',
+                                                    background: qCount === n ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : '#f1f5f9',
+                                                    color: qCount === n ? 'white' : '#64748b',
+                                                    fontWeight: 700,
+                                                    fontSize: '0.95rem',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                                    boxShadow: qCount === n ? '0 8px 16px -4px rgba(99, 102, 241, 0.4)' : 'none',
+                                                    transform: qCount === n ? 'scale(1.05)' : 'scale(1)'
+                                                }}
+                                            >
+                                                {n}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
 
-                                <div style={{ textAlign: 'left' }}>
-                                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '12px', fontSize: '0.9rem' }}>MODE</label>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                        <button onClick={() => setMode('PRACTICE')} className={mode === 'PRACTICE' ? 'count-btn active' : 'count-btn'}>
-                                            Practice
+                                {/* Row 2: Mode */}
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>Difficulty</label>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <button
+                                            onClick={() => setMode('PRACTICE')}
+                                            style={{
+                                                flex: 1,
+                                                padding: '10px',
+                                                borderRadius: '50px',
+                                                border: 'none',
+                                                background: mode === 'PRACTICE' ? 'linear-gradient(135deg, #10b981, #059669)' : '#f1f5f9',
+                                                color: mode === 'PRACTICE' ? 'white' : '#64748b',
+                                                fontWeight: 700,
+                                                fontSize: '0.95rem',
+                                                cursor: 'pointer',
+                                                display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center',
+                                                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                                boxShadow: mode === 'PRACTICE' ? '0 8px 16px -4px rgba(16, 185, 129, 0.4)' : 'none',
+                                                transform: mode === 'PRACTICE' ? 'scale(1.05)' : 'scale(1)'
+                                            }}
+                                        >
+                                            <BookOpen size={16} /> Practice
                                         </button>
-                                        <button onClick={() => setMode('TEST')} className={mode === 'TEST' ? 'count-btn active' : 'count-btn'}>
-                                            Test
+                                        <button
+                                            onClick={() => setMode('TEST')}
+                                            style={{
+                                                flex: 1,
+                                                padding: '10px',
+                                                borderRadius: '50px',
+                                                border: 'none',
+                                                background: mode === 'TEST' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '#f1f5f9',
+                                                color: mode === 'TEST' ? 'white' : '#64748b',
+                                                fontWeight: 700,
+                                                fontSize: '0.95rem',
+                                                cursor: 'pointer',
+                                                display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center',
+                                                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                                boxShadow: mode === 'TEST' ? '0 8px 16px -4px rgba(245, 158, 11, 0.4)' : 'none',
+                                                transform: mode === 'TEST' ? 'scale(1.05)' : 'scale(1)'
+                                            }}
+                                        >
+                                            <Trophy size={16} /> Test
                                         </button>
                                     </div>
-                                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '8px' }}>
-                                        {mode === 'PRACTICE' ? "Immediate feedback & explanations" : "Hide answers until the very end"}
-                                    </p>
                                 </div>
-
-                                <button onClick={fetchQuestions} className="primary-btn" style={{ height: '54px', fontSize: '1.1rem', marginTop: '16px' }}>
-                                    Launch Quiz
-                                </button>
                             </div>
+
+                            <button
+                                onClick={fetchQuestions}
+                                className="primary-btn"
+                                style={{
+                                    width: '100%',
+                                    height: '52px',
+                                    fontSize: '1rem',
+                                    fontWeight: 800,
+                                    background: 'linear-gradient(90deg, #4f46e5, #7c3aed)',
+                                    border: 'none',
+                                    borderRadius: '16px',
+                                    boxShadow: '0 8px 24px -4px rgba(79, 70, 229, 0.5)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '10px',
+                                    color: 'white',
+                                    letterSpacing: '0.5px',
+                                    transform: 'translateY(0)',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+                                onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            >
+                                Start Mission 🚀
+                            </button>
                         </motion.div>
                     )}
 

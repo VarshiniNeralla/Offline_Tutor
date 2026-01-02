@@ -20,7 +20,8 @@ const QuizTool = () => {
     const navigate = useNavigate();
 
     // quizContext passed from Dashboard
-    const { subject, bookId, bookName, class: className } = location.state || {};
+    const { subject, bookId, bookName: rawBookName, class: className } = location.state || {};
+    const bookName = rawBookName ? rawBookName.replace(/\.pdf$/i, '') : '';
 
     // Redirect if no context
     useEffect(() => {
@@ -106,6 +107,40 @@ const QuizTool = () => {
         setView('SETUP');
     };
 
+    const saveProgress = async (finalQuestions, finalAnswers) => {
+        try {
+            const studentName = localStorage.getItem("studentName");
+            const studentClass = localStorage.getItem("studentClass");
+
+            const correctCount = finalQuestions.reduce((acc, q, idx) => {
+                return acc + (finalAnswers[idx] === q.correct_index ? 1 : 0);
+            }, 0);
+
+            const payload = {
+                type: 'quiz',
+                student_name: studentName,
+                student_class: studentClass,
+                subject,
+                book_id: bookId,
+                book_name: bookName,
+                score: correctCount,
+                total_questions: finalQuestions.length,
+                questions: finalQuestions.map((q, idx) => ({
+                    ...q,
+                    user_answer: finalAnswers[idx]
+                }))
+            };
+
+            await fetch('/api/progress/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch (err) {
+            console.error("Save progress failed", err);
+        }
+    };
+
     return (
         <div className="dashboard-root" style={{ minHeight: '100vh', background: '#f8fafc' }}>
             <style>{styles}</style>
@@ -145,7 +180,10 @@ const QuizTool = () => {
                             setCurrentQIndex={setCurrentQIndex}
                             userAnswers={userAnswers}
                             setUserAnswers={setUserAnswers}
-                            onFinish={() => setView('RESULTS')}
+                            onFinish={() => {
+                                setView('RESULTS');
+                                saveProgress(questions, userAnswers);
+                            }}
                             timeElapsed={timeElapsed}
                             setTimeElapsed={setTimeElapsed}
                         />

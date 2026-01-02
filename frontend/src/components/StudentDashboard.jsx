@@ -20,7 +20,8 @@ import {
     Layout,
     Scale,
     HelpCircle,
-    ListChecks
+    ListChecks,
+    History
 } from "lucide-react";
 
 import "../assets/styles/student-dashboard.css";
@@ -110,6 +111,9 @@ const StudentDashboard = () => {
                         </div>
                     </div>
                     <div className="header-actions">
+                        <button onClick={() => navigate("/student/progress")} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', borderColor: 'var(--primary-light)' }}>
+                            <History size={18} /> My Progress
+                        </button>
                         <button onClick={() => navigate("/student/login")}>Change Class</button>
                         <button className="logout" onClick={logout}><LogOut size={18} /></button>
                     </div>
@@ -194,11 +198,12 @@ const StudentDashboard = () => {
                             onBack={() => setActiveSubject(null)}
 
                             onStartBook={(book, toolType = 'chat') => {
+                                const cleanName = book.file_name.replace(/\.pdf$/i, '');
                                 const toolState = {
                                     subject: activeSubject.name,
                                     class: studentClass,
                                     bookId: book.book_id,
-                                    bookName: book.file_name,
+                                    bookName: cleanName,
                                     toolType
                                 };
 
@@ -282,7 +287,7 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
                             <div className="book-select-info">
                                 <div className="book-select-icon"><FileText size={20} /></div>
                                 <div>
-                                    <h4>{book.file_name}</h4>
+                                    <h4>{book.file_name.replace(/\.pdf$/i, '')}</h4>
                                     <p>Ready for {selectedTool.title}</p>
                                 </div>
                             </div>
@@ -334,7 +339,7 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
                                     <FileText size={20} />
                                 </div>
                                 <div>
-                                    <h4>{book.file_name}</h4>
+                                    <h4>{book.file_name.replace(/\.pdf$/i, '')}</h4>
                                     <p>{book.pages} pages • {book.chunks} blocks</p>
                                 </div>
                             </div>

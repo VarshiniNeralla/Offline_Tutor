@@ -3,12 +3,18 @@ import json
 import warnings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+try:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+except ImportError:
+    HuggingFaceEmbeddings = None
 from langchain_community.vectorstores import Chroma
 import requests
-from faster_whisper import WhisperModel
+# from faster_whisper import WhisperModel
 import torch
-import pyttsx3  # OFFLINE TTS instead of gTTS
+try:
+    import pyttsx3  # OFFLINE TTS instead of gTTS
+except ImportError:
+    pyttsx3 = None
 import tempfile
 import io
 import re
@@ -20,7 +26,7 @@ warnings.filterwarnings('ignore')
 
 class AITextbookTutorMultilingualBackendOffline:
     def __init__(self, language='telugu'):
-        print(f"🚀 Initializing Offline AI Tutor ({language})...")
+        print(f"Initializing Offline AI Tutor ({language})...")
         self.language = language
         self.textbooks = {}
         self.vectorstore = None
@@ -32,12 +38,17 @@ class AITextbookTutorMultilingualBackendOffline:
             self.asr_available = False
         self.setup_offline_tts()
         self.load_existing_data()
-        print("✅ Offline AI Tutor Ready!")
+        print("Offline AI Tutor Ready!")
     
     def setup_embeddings_offline(self):
         """Setup embeddings with proper offline caching"""
+        if HuggingFaceEmbeddings is None:
+            print("Embeddings library (sentence-transformers) missing. RAG disabled.")
+            self.embeddings = None
+            return
+
         try:
-            print("📥 Ensuring embedding model is fully downloaded...")
+            print("Ensuring embedding model is fully downloaded...")
             os.makedirs("./models/embeddings", exist_ok=True)
             
             # Set environment variables for offline mode
@@ -52,10 +63,10 @@ class AITextbookTutorMultilingualBackendOffline:
                     model_kwargs={'device': 'cpu', 'local_files_only': True},
                     cache_folder="./models/embeddings"
                 )
-                print("✅ Offline embeddings ready!")
+                print("Offline embeddings ready!")
                 
             except Exception as offline_error:
-                print(f"⚠️ Offline mode failed: {offline_error}")
+                print(f"Offline mode failed: {offline_error}")
                 
                 # Remove offline mode temporarily to download
                 if 'HF_HUB_OFFLINE' in os.environ:
@@ -77,8 +88,8 @@ class AITextbookTutorMultilingualBackendOffline:
                 print("✅ Embedding model downloaded and cached for offline use!")
                 
         except Exception as e:
-            print(f"❌ Embeddings setup failed: {e}")
-            raise e
+            print(f"Embeddings setup failed: {e}. RAG disabled.")
+            self.embeddings = None
         
     def setup_telugu_asr_offline(self):
         """Setup Telugu speech recognition with detailed error reporting"""
@@ -148,6 +159,10 @@ class AITextbookTutorMultilingualBackendOffline:
         """Setup OFFLINE Text-to-Speech using pyttsx3"""
         try:
             print("🔊 Setting up offline text-to-speech...")
+            if pyttsx3 is None:
+                print("pyttsx3 not installed. TTS disabled.")
+                self.tts_engine = None
+                return
             self.tts_engine = pyttsx3.init()
             
             # Configure TTS for Telugu/English

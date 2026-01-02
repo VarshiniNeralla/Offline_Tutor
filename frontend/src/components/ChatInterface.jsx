@@ -247,9 +247,11 @@ const ChatInterface = () => {
     subject: navSubject,
     class: navClass,
     bookId: navBookId,
-    bookName: navBookName,
+    bookName: rawNavBookName,
     initTool
   } = location.state || {};
+
+  const navBookName = rawNavBookName ? rawNavBookName.replace(/\.pdf$/i, '') : '';
 
   // 1. CHAT HISTORY STATE
   const [chats, setChats] = useState(() => {
@@ -319,7 +321,8 @@ const ChatInterface = () => {
 
   const startNewChat = (bId, bName, sub, cls, isAuto = false, toolType = null) => {
     const targetBId = bId || navBookId || currentChat?.bookId;
-    const targetBName = bName || navBookName || currentChat?.bookName;
+    const rawTargetBName = bName || navBookName || currentChat?.bookName;
+    const targetBName = rawTargetBName ? rawTargetBName.replace(/\.pdf$/i, '') : '';
     const targetSub = sub || navSubject || currentChat?.subject;
     const targetCls = cls || navClass || currentChat?.className;
 
@@ -500,7 +503,7 @@ const ChatInterface = () => {
                   <FileText size={14} className="item-icon" />
                   <div className="item-info">
                     <span className="item-title">{chat.title}</span>
-                    <span className="item-meta">{chat.bookName}</span>
+                    <span className="item-meta">{chat.bookName?.replace(/\.pdf$/i, '')}</span>
                   </div>
                   <button className="delete-btn" onClick={(e) => deleteChat(e, chat.id)}>
                     <Trash2 size={12} />
@@ -537,7 +540,7 @@ const ChatInterface = () => {
               <h1>{currentChat?.title || "AI Tutor"}</h1>
               {currentChat && (
                 <p>
-                  <BookOpen size={12} /> {currentChat.bookName} • {currentChat.subject}
+                  <BookOpen size={12} /> {currentChat.bookName?.replace(/\.pdf$/i, '')} • {currentChat.subject}
                 </p>
               )}
             </div>
@@ -609,7 +612,7 @@ const ChatInterface = () => {
             </button>
 
             <input
-              placeholder={currentChat ? `Ask about ${currentChat.bookName}...` : "Select a chat to begin..."}
+              placeholder={currentChat ? `Ask about ${currentChat.bookName?.replace(/\.pdf$/i, '')}...` : "Select a chat to begin..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}

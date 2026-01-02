@@ -10,29 +10,32 @@ import uvicorn
 from contextlib import asynccontextmanager
 
 # Import backend logic
-from tutor_backend_multilingual import AITextbookTutorMultilingualBackend
+from tutor_backend_multilingual import AITextbookTutorMultilingualBackendOffline
 from admin_backend import AITextbookAdminBackendOffline
+from student_progress_manager import StudentProgressManager
 
 # Global instances
 tutor_backend = None
 admin_backend = None
+progress_manager = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global tutor_backend, admin_backend
-    print("🚀 Starting Offline Neural Server...")
+    global tutor_backend, admin_backend, progress_manager
+    print("Starting Offline Neural Server...")
     
     # Initialize backends
-    tutor_backend = AITextbookTutorMultilingualBackend(language='english') 
+    tutor_backend = AITextbookTutorMultilingualBackendOffline(language='english') 
     admin_backend = AITextbookAdminBackendOffline()
+    progress_manager = StudentProgressManager()
     
     # Skip warmup - will warm on first request
-    print("✅ Neural Core ready (warmup on first request)")
+    print("Neural Core & Progress Manager ready (warmup on first request)")
         
     yield
     # Shutdown logic if needed
-    print("👋 Shutting down Neural Server...")
+    print("Shutting down Neural Server...")
 
 app = FastAPI(title="AI Tutor Offline API", lifespan=lifespan)
 
@@ -67,6 +70,17 @@ class StatsResponse(BaseModel):
 class RenameRequest(BaseModel):
     book_id: str
     new_name: str
+
+class ProgressSaveRequest(BaseModel):
+    type: str # 'quiz', 'truefalse'
+    student_name: str
+    student_class: str
+    subject: str
+    book_id: str
+    book_name: str
+    score: int
+    total_questions: int
+    questions: List[dict]
 
 # --- Routes ---
 
@@ -217,6 +231,38 @@ async def get_book_file(book_id: str):
         raise HTTPException(status_code=404, detail="File not found on disk")
         
     return FileResponse(file_path, media_type='application/pdf', filename=book['file_name'])
+
+# --- Progress Tracking Routes ---
+
+@app.post("/api/progress/save")
+async def save_progress(request: ProgressSaveRequest):
+    print(f"📁 Saving progress for {request.student_name}: {request.type}")
+    if not progress_manager:
+        raise HTTPException(status_code=503, detail="System initializing")
+    
+    success, result = progress_manager.save_attempt(request.dict())
+    if success:
+        return {"status": "success", "attempt_id": result}
+    raise HTTPException(status_code=500, detail=result)
+
+@app.get("/api/progress/history")
+async def get_progress_history(name: str = None, student_class: str = None):
+    print(f"📁 Fetching history for {name} ({student_class})")
+    if not progress_manager:
+        raise HTTPException(status_code=503, detail="System initializing")
+    
+    history = progress_manager.get_history(student_name=name, student_class=student_class)
+    return history
+
+@app.get("/api/progress/attempt/{attempt_id}")
+async def get_attempt(attempt_id: str):
+    if not progress_manager:
+        raise HTTPException(status_code=503, detail="System initializing")
+    
+    attempt = progress_manager.get_attempt_details(attempt_id)
+    if attempt:
+        return attempt
+    raise HTTPException(status_code=404, detail="Attempt not found")
 
 # Static Files (React Build)
 # We will check if the build folder exists and mount it
