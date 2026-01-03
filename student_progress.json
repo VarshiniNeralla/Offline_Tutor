@@ -143,5 +143,97 @@
         ],
         "attempt_id": "48ddd118-0ddc-4d77-a42a-7439e9258e4f",
         "timestamp": "2026-01-03T14:24:41.214963"
+    },
+    {
+        "type": "quiz",
+        "student_name": "Nishi",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 1,
+        "total_questions": 6,
+        "questions": [
+            {
+                "id": 1,
+                "question": "What are oceans?",
+                "options": [
+                    "A) Large bodies of saltwater that cover most of the Earth's surface.",
+                    "B) Landmasses found on continents.",
+                    "C) Islands surrounded by water.",
+                    "D) Mountain ranges undersea."
+                ],
+                "correct_index": 0,
+                "explanation": "Fact. Oceans are large expanses of saline water covering much of our planet, playing a crucial role in climate and supporting marine life.",
+                "user_answer": 0
+            },
+            {
+                "id": 2,
+                "question": "What is the approximate proportion of land to water on Earth?",
+                "options": [
+                    "A) Equal parts land and water.",
+                    "B) More land than water, with a slight majority in both hemispheres.",
+                    "C) Slightly more water than land globally but less near continents.",
+                    "D) Significantly more water than land worldwide."
+                ],
+                "correct_index": 0,
+                "explanation": "Fact. About 71% of the Earth's surface is covered by oceans, with a slight majority in both hemispheres being water and about 29% as land.",
+                "user_answer": 3
+            },
+            {
+                "id": 3,
+                "question": "Which continent holds more than half of its area underwater?",
+                "options": [
+                    "A) Australia",
+                    "B) Antarctica",
+                    "C) Greenland",
+                    "D) New Zealand"
+                ],
+                "correct_index": 1,
+                "explanation": "Fact. About 80% of the land in Antarctica is covered by ice.",
+                "user_answer": 0
+            },
+            {
+                "id": 4,
+                "question": "What are continents?",
+                "options": [
+                    "A) Large bodies of water that cover most of Earth's surface.",
+                    "B) Landmasses found on oceans.",
+                    "C) Islands surrounded by land.",
+                    "D) Undersea mountain ranges."
+                ],
+                "correct_index": 2,
+                "explanation": "Fact. Continents are large, continuous expanses of land making up the major land areas of our planet.",
+                "user_answer": 1
+            },
+            {
+                "id": 5,
+                "question": "What is a 'polynya'?",
+                "options": [
+                    "A) A type of marine mammal found in polar regions.",
+                    "B) An iceberg formed from sea water.",
+                    "C) Open-water areas surrounded by sea ice, often near the poles.",
+                    "D) Undersea volcanic activity."
+                ],
+                "correct_index": 3,
+                "explanation": "Fact. Polynyas are openings that form within sea ice and allow for exchange of gases between ocean and atmosphere in polar regions.",
+                "user_answer": 0
+            },
+            {
+                "id": 6,
+                "question": "What is the largest ocean on Earth?",
+                "options": [
+                    "A) Atlantic Ocean",
+                    "B) Indian Ocean",
+                    "C) Pacific Ocean",
+                    "D) Arctic Ocean"
+                ],
+                "correct_index": 4,
+                "explanation": "Fact. The Pacific Ocean covers more of the Earth's surface than any other ocean.",
+                "user_answer": 2
+            }
+        ],
+        "attempt_id": "7b910f4d-6f39-46c9-b20d-0d60c2b68829",
+        "timestamp": "2026-01-03T14:51:05.949604"
     }
 ]
