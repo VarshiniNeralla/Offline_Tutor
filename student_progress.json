@@ -1,26 +1,147 @@
 [
-  {
-    "id": "fa0a069d-4bd6-4f59-894e-55c7f606a5ae",
-    "timestamp": "2026-01-02T22:38:19.615726",
-    "type": "quiz",
-    "student_name": "VerifyBot",
-    "student_class": "Class 10",
-    "subject": "Physics",
-    "book_id": "test_book_123",
-    "book_name": "Test Physics Book",
-    "score": 8,
-    "total_questions": 10,
-    "questions": [
-      {
-        "question": "What is gravity?",
-        "user_answer": 1,
-        "correct_index": 1,
-        "options": [
-          "A",
-          "B"
+    {
+        "id": "fa0a069d-4bd6-4f59-894e-55c7f606a5ae",
+        "timestamp": "2026-01-02T22:38:19.615726",
+        "type": "quiz",
+        "student_name": "VerifyBot",
+        "student_class": "Class 10",
+        "subject": "Physics",
+        "book_id": "test_book_123",
+        "book_name": "Test Physics Book",
+        "score": 8,
+        "total_questions": 10,
+        "questions": [
+            {
+                "question": "What is gravity?",
+                "user_answer": 1,
+                "correct_index": 1,
+                "options": [
+                    "A",
+                    "B"
+                ],
+                "explanation": "It pulls down."
+            }
+        ]
+    },
+    {
+        "type": "quiz",
+        "student_name": "Test Student",
+        "student_class": "Class 10",
+        "subject": "Physics",
+        "book_id": "test_book",
+        "book_name": "Test Book",
+        "score": 4,
+        "total_questions": 5,
+        "questions": [],
+        "attempt_id": "c68ac568-ed1a-4024-b7e1-17b0e5438807",
+        "timestamp": "2026-01-03T14:21:21.252009"
+    },
+    {
+        "type": "truefalse",
+        "student_name": "Nishi",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 3,
+        "total_questions": 5,
+        "questions": [
+            {
+                "statement": "India is a part of the largest continent",
+                "answer": true,
+                "explanation": "Asia has more landmass than any other.",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "Oceans are not distributed equally between hemispheres",
+                "answer": true,
+                "explanation": "Northern Hemisphere holds less water due to ice caps and landmass.",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "India is a major source of ocean pollution",
+                "answer": false,
+                "explanation": "While India contributes to global issues, it's not the primary source.",
+                "corrected_statement": "India does contribute but isn't solely responsible for most ocean pollution.",
+                "user_answer": true,
+                "correct_answer": false
+            },
+            {
+                "statement": "Antarctica is the coldest continent",
+                "answer": true,
+                "explanation": "It has a mostly ice-covered landmass.",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "Australia is the largest island on Earth",
+                "answer": false,
+                "explanation": "Ireland and New Guinea are larger islands.",
+                "corrected_statement": "The largest continent surrounding an ocean.",
+                "user_answer": true,
+                "correct_answer": false
+            }
         ],
-        "explanation": "It pulls down."
-      }
-    ]
-  }
+        "attempt_id": "534a39ca-1b23-45d0-8fa8-be022eeff014",
+        "timestamp": "2026-01-03T14:24:34.970462"
+    },
+    {
+        "type": "truefalse",
+        "student_name": "Nishi",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 3,
+        "total_questions": 5,
+        "questions": [
+            {
+                "statement": "India is a part of the largest continent",
+                "answer": true,
+                "explanation": "Asia has more landmass than any other.",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "Oceans are not distributed equally between hemispheres",
+                "answer": true,
+                "explanation": "Northern Hemisphere holds less water due to ice caps and landmass.",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "India is a major source of ocean pollution",
+                "answer": false,
+                "explanation": "While India contributes to global issues, it's not the primary source.",
+                "corrected_statement": "India does contribute but isn't solely responsible for most ocean pollution.",
+                "user_answer": true,
+                "correct_answer": false
+            },
+            {
+                "statement": "Antarctica is the coldest continent",
+                "answer": true,
+                "explanation": "It has a mostly ice-covered landmass.",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "Australia is the largest island on Earth",
+                "answer": false,
+                "explanation": "Ireland and New Guinea are larger islands.",
+                "corrected_statement": "The largest continent surrounding an ocean.",
+                "user_answer": true,
+                "correct_answer": false
+            }
+        ],
+        "attempt_id": "48ddd118-0ddc-4d77-a42a-7439e9258e4f",
+        "timestamp": "2026-01-03T14:24:41.214963"
+    }
 ]

@@ -1032,6 +1032,8 @@ SUMMARY OUTPUT:"""
             return self.generate_summary_response(question, selected_subjects, selected_books)
         if mode == "keywords":
             return self.generate_keywords_response(question, selected_subjects, selected_books)
+        if mode == "truefalse":
+            return self.generate_true_false_response(question, selected_subjects, selected_books)
 
         # STEP 1: Detect Intent (Brevity vs Elaboration)
         if not mode:

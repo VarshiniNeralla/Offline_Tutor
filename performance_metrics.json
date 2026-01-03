@@ -159,5 +159,12 @@
     "tokens": 328,
     "time": 168.42,
     "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2026-01-03 11:26:08",
+    "mode": "truefalse",
+    "tokens": 245,
+    "time": 139.44,
+    "model": "phi3:latest"
   }
 ]

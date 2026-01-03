@@ -12,10 +12,12 @@ from contextlib import asynccontextmanager
 # Import backend logic
 from tutor_backend_multilingual import AITextbookTutorMultilingualBackend
 from admin_backend import AITextbookAdminBackendOffline
+from progress_manager import ProgressManager
 
 # Global instances
 tutor_backend = None
 admin_backend = None
+progress_manager = ProgressManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -73,6 +75,17 @@ class StatsResponse(BaseModel):
 class RenameRequest(BaseModel):
     book_id: str
     new_name: str
+
+class ProgressRequest(BaseModel):
+    type: str # 'quiz' or 'truefalse'
+    student_name: str
+    student_class: str
+    subject: str
+    book_id: str
+    book_name: str
+    score: int
+    total_questions: int
+    questions: List[dict]
 
 # --- Routes ---
 
@@ -200,6 +213,28 @@ async def rename_textbook_endpoint(request: RenameRequest):
     if success:
          return {"status": "success", "message": message}
     raise HTTPException(status_code=400, detail=message)
+
+# --- Progress Endpoints ---
+
+@app.post("/api/progress/save")
+async def save_progress_record(request: ProgressRequest):
+    print(f"📊 Saving progress for {request.student_name} ({request.type})")
+    try:
+        attempt_id = progress_manager.save_progress(request.model_dump())
+        return {"status": "success", "attempt_id": attempt_id}
+    except Exception as e:
+        print(f"❌ Failed to save progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/progress/history")
+async def get_progress_history(name: str, student_class: str):
+    print(f"📜 Fetching history for {name} ({student_class})")
+    try:
+        history = progress_manager.get_history(student_name=name, student_class=student_class)
+        return history
+    except Exception as e:
+        print(f"❌ Failed to fetch history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/textbooks")
 async def list_textbooks():
