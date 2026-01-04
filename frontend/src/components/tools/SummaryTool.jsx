@@ -615,13 +615,6 @@ const styles = `
 .save-pill { background: var(--primary); color: white; border: none; padding: 12px 32px; border-radius: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 10px 20px rgba(79, 70, 229, 0.2); }
 
 /* REUSE OLD BUTTON STYLES FOR TOP HEADER */
-.back-icon-btn {
-    width: 40px; height: 40px;
-    display: flex; align-items: center; justify-content: center;
-    background: white; border: 1px solid var(--border);
-    border-radius: 12px; color: var(--text-muted);
-    cursor: pointer; transition: all 0.2s ease;
-}
 .delete-btn-top {
     background: white; border: 1px solid var(--border);
     width: 40px; height: 40px; border-radius: 12px;

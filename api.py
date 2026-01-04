@@ -85,7 +85,8 @@ class ProgressRequest(BaseModel):
     book_name: str
     score: int
     total_questions: int
-    questions: List[dict]
+    questions: Optional[List[dict]] = None
+    metadata: Optional[dict] = None
 
 # --- Routes ---
 

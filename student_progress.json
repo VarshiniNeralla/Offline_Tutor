@@ -235,5 +235,120 @@
         ],
         "attempt_id": "7b910f4d-6f39-46c9-b20d-0d60c2b68829",
         "timestamp": "2026-01-03T14:51:05.949604"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "bdb1fde8-f1ea-4eff-9f12-ed2d4a2aaabc",
+        "book_name": "Locating Places on the Earth",
+        "score": 100,
+        "total_questions": 10,
+        "questions": null,
+        "metadata": {
+            "review_count": 0,
+            "known_count": 10,
+            "duration_seconds": 37
+        },
+        "attempt_id": "8468d5c9-1f0f-4dfb-abbf-0c81de191bce",
+        "timestamp": "2026-01-04T18:27:45.597233"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 100,
+        "total_questions": 10,
+        "questions": null,
+        "metadata": {
+            "review_count": 0,
+            "known_count": 10,
+            "duration_seconds": 31,
+            "flashcards": [
+                {
+                    "id": 1,
+                    "front": "What are oceans?",
+                    "back": "Large bodies of saltwater covering most of the Earth's surface.",
+                    "hint": "Earth's main water reservoir"
+                },
+                {
+                    "id": 2,
+                    "front": "What are continents?",
+                    "back": "Vast landmasses on our planet forming its major divisions.",
+                    "hint": "Landforms larger than islands."
+                },
+                {
+                    "id": 3,
+                    "front": "How many oceans and continents are there according to the most common count?",
+                    "back": "Seven oceans and seven continents.",
+                    "hint": "Most widely adopted list."
+                },
+                {
+                    "id": 4,
+                    "front": "What is another way of considering Europe and Asia in terms of geography?",
+                    "back": "'Eurasia', a single landmass formed by combining Europe and Asia.",
+                    "hint": "Cultural and historical reasons."
+                },
+                {
+                    "id": 5,
+                    "front": "What are the names given to circular lines on maps representing latitude?",
+                    "back": "'Parallels' or 'circles of latitude'.",
+                    "hint": "They run parallel to the equator."
+                },
+                {
+                    "id": 6,
+                    "front": "What are oceans?",
+                    "back": "Vast bodies of saltwater covering most of the Earth's surface.",
+                    "hint": "Interconnected water expanses on our planet.",
+                    "importance": "high"
+                },
+                {
+                    "id": 7,
+                    "front": "What are continents?",
+                    "back": "Large landmasses visible on Earth's surface.",
+                    "hint": "Land areas that can be identified and named.",
+                    "importance": "high"
+                },
+                {
+                    "id": 8,
+                    "front": "What is another way of considering Eurasia?",
+                    "back": "'Eurasia' often regarded as a single continent formed by the combination of Europe and Asia.",
+                    "hint": "Two continents seen as one landmass in some geological perspectives.",
+                    "importance": "medium"
+                },
+                {
+                    "id": 9,
+                    "front": "How many oceans are there?",
+                    "back": "Five major interconnected bodies of saltwater on Earth: Pacific Ocean, Atlantic Ocean, Indian Ocean, Arctic Ocean, and Southern (or Antarctic) Ocean.",
+                    "hint": "List the five primary seas that cover most of our planet's surface area.",
+                    "importance": "high"
+                },
+                {
+                    "id": 10,
+                    "front": "How many continents are there?",
+                    "back": "Four to seven commonly recognized landmasses on Earth: Africa-Eurasia (or Eurasia), America, Antarctica, Australia.",
+                    "hint": "Count the number of major continents acknowledged globally and in various geological perspectives.",
+                    "importance": "medium"
+                }
+            ],
+            "knownIndices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
+        "attempt_id": "cd32e33f-b811-48e4-a183-6585f8655d1b",
+        "timestamp": "2026-01-04T18:49:26.517619"
     }
 ]

@@ -477,29 +477,6 @@ const QuizError = ({ message, onRetry }) => (
 
 // --- CSS STYLES (Inline for now, can move to CSS file later) ---
 const styles = `
-.back-icon-btn {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.back-icon-btn:hover {
-    background: var(--primary-soft);
-    border-color: var(--primary);
-    color: var(--primary);
-    transform: translateX(-2px);
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
-}
-
 .quiz-card {
     background: white;
     padding: 40px;

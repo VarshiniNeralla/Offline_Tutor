@@ -14,7 +14,8 @@ import {
     Target,
     Clock,
     CheckCircle2,
-    XCircle
+    XCircle,
+    Layers
 } from "lucide-react";
 import "../assets/styles/student-dashboard.css";
 
@@ -23,7 +24,7 @@ const MyProgress = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedAttempt, setSelectedAttempt] = useState(null);
-    const [filterType, setFilterType] = useState("all"); // all, quiz, truefalse
+    const [filterType, setFilterType] = useState("all"); // all, quiz, truefalse, flashcards
 
     useEffect(() => {
         fetchHistory();
@@ -93,7 +94,7 @@ const MyProgress = () => {
                         >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                                 <div style={{ display: 'flex', gap: '12px' }}>
-                                    {['all', 'quiz', 'truefalse'].map(t => (
+                                    {['all', 'quiz', 'truefalse', 'flashcards'].map(t => (
                                         <button
                                             key={t}
                                             onClick={() => setFilterType(t)}
@@ -150,11 +151,11 @@ const MyProgress = () => {
                                         >
                                             <div style={{
                                                 width: '48px', height: '48px', borderRadius: '14px',
-                                                background: attempt.type === 'quiz' ? '#eff6ff' : '#f0fdf4',
-                                                color: attempt.type === 'quiz' ? '#2563eb' : '#10b981',
+                                                background: attempt.type === 'quiz' ? '#eff6ff' : (attempt.type === 'flashcards' ? '#f5f3ff' : '#f0fdf4'),
+                                                color: attempt.type === 'quiz' ? '#2563eb' : (attempt.type === 'flashcards' ? '#7c3aed' : '#10b981'),
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
                                             }}>
-                                                {attempt.type === 'quiz' ? <Zap size={24} /> : <CheckSquare size={24} />}
+                                                {attempt.type === 'quiz' ? <Zap size={24} /> : (attempt.type === 'flashcards' ? <Layers size={24} /> : <CheckSquare size={24} />)}
                                             </div>
 
                                             <div style={{ flex: 1 }}>
@@ -172,9 +173,9 @@ const MyProgress = () => {
                                                 <div style={{
                                                     fontSize: '1.2rem',
                                                     fontWeight: 800,
-                                                    color: (attempt.score / attempt.total_questions) >= 0.8 ? '#10b981' : '#f59e0b'
+                                                    color: (attempt.type === 'flashcards' ? (attempt.metadata?.known_count / attempt.total_questions) : (attempt.score / attempt.total_questions)) >= 0.8 ? '#10b981' : '#f59e0b'
                                                 }}>
-                                                    {attempt.score}/{attempt.total_questions}
+                                                    {attempt.type === 'flashcards' ? (attempt.metadata?.known_count || 0) : attempt.score}/{attempt.total_questions}
                                                 </div>
                                                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                                                     Score
@@ -198,108 +199,172 @@ const MyProgress = () => {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
                                 <div className="stat-card" style={{ background: 'white', padding: '20px', borderRadius: '20px', border: '1px solid var(--border)', textAlign: 'center' }}>
                                     <Target size={24} color="var(--primary)" style={{ margin: '0 auto 8px' }} />
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{selectedAttempt.score}/{selectedAttempt.total_questions}</div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Score</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
+                                        {selectedAttempt.type === 'flashcards'
+                                            ? `${selectedAttempt.metadata?.known_count || 0}/${selectedAttempt.total_questions}`
+                                            : `${selectedAttempt.score}/${selectedAttempt.total_questions}`}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                        {selectedAttempt.type === 'flashcards' ? 'Mastered' : 'Score'}
+                                    </div>
                                 </div>
                                 <div className="stat-card" style={{ background: 'white', padding: '20px', borderRadius: '20px', border: '1px solid var(--border)', textAlign: 'center' }}>
                                     <Award size={24} color="#f59e0b" style={{ margin: '0 auto 8px' }} />
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{Math.round((selectedAttempt.score / selectedAttempt.total_questions) * 100)}%</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
+                                        {selectedAttempt.type === 'flashcards'
+                                            ? Math.round(((selectedAttempt.metadata?.known_count || 0) / selectedAttempt.total_questions) * 100)
+                                            : Math.round((selectedAttempt.score / selectedAttempt.total_questions) * 100)}%
+                                    </div>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Accuracy</div>
                                 </div>
                                 <div className="stat-card" style={{ background: 'white', padding: '20px', borderRadius: '20px', border: '1px solid var(--border)', textAlign: 'center' }}>
                                     <Clock size={24} color="#6366f1" style={{ margin: '0 auto 8px' }} />
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{formatDate(selectedAttempt.timestamp).split(',')[1]}</div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Time</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
+                                        {selectedAttempt.metadata?.duration_seconds
+                                            ? `${Math.floor(selectedAttempt.metadata.duration_seconds / 60)}m ${Math.floor(selectedAttempt.metadata.duration_seconds % 60)}s`
+                                            : formatDate(selectedAttempt.timestamp).split(',')[1]}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Duration</div>
                                 </div>
                             </div>
 
                             {/* Detailed List */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <h3 style={{ margin: '0 0 -8px', fontSize: '1.2rem', fontWeight: 700 }}>Question Review</h3>
+                                <h3 style={{ margin: '0 0 -8px', fontSize: '1.2rem', fontWeight: 700 }}>
+                                    {selectedAttempt.type === 'flashcards' ? 'Cards Studied' : 'Question Review'}
+                                </h3>
 
-                                {selectedAttempt.questions.map((q, idx) => {
-                                    const isCorrect = selectedAttempt.type === 'quiz'
-                                        ? q.user_answer === q.correct_index
-                                        : q.user_answer === q.correct_answer;
-
-                                    return (
-                                        <div key={idx} style={{
-                                            background: 'white',
-                                            borderRadius: '20px',
-                                            padding: '24px',
-                                            border: '1px solid var(--border)',
-                                            borderLeft: `6px solid ${isCorrect ? '#10b981' : '#f43f5e'}`
-                                        }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-muted)' }}>QUESTION {idx + 1}</span>
-                                                <div style={{
-                                                    display: 'flex', alignItems: 'center', gap: '4px',
-                                                    fontSize: '0.8rem', fontWeight: 700,
-                                                    color: isCorrect ? '#10b981' : '#f43f5e',
-                                                    background: isCorrect ? '#f0fdf4' : '#fef2f2',
-                                                    padding: '4px 10px', borderRadius: '100px'
-                                                }}>
-                                                    {isCorrect ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                                    {isCorrect ? 'Correct' : 'Incorrect'}
-                                                </div>
-                                            </div>
-
-                                            <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1e293b', marginBottom: '20px', lineHeight: 1.5 }}>
-                                                {selectedAttempt.type === 'quiz' ? q.question : q.statement}
-                                            </p>
-
-                                            {selectedAttempt.type === 'quiz' ? (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                                                    {q.options.map((opt, oIdx) => (
-                                                        <div key={oIdx} style={{
-                                                            padding: '12px 16px',
-                                                            borderRadius: '12px',
-                                                            fontSize: '0.95rem',
-                                                            border: '1px solid',
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            borderColor: oIdx === q.correct_index
-                                                                ? '#10b981'
-                                                                : (oIdx === q.user_answer ? '#f43f5e' : '#e2e8f0'),
-                                                            background: oIdx === q.correct_index
-                                                                ? '#f0fdf4'
-                                                                : (oIdx === q.user_answer ? '#fef2f2' : 'white'),
-                                                            color: oIdx === q.correct_index
-                                                                ? '#065f46'
-                                                                : (oIdx === q.user_answer ? '#991b1b' : '#64748b'),
-                                                            fontWeight: (oIdx === q.correct_index || oIdx === q.user_answer) ? 700 : 400
+                                {selectedAttempt.type === 'flashcards' ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                        {selectedAttempt.metadata?.flashcards ? (
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                {selectedAttempt.metadata.flashcards.map((card, cIdx) => {
+                                                    const isKnown = selectedAttempt.metadata.knownIndices?.includes(cIdx);
+                                                    return (
+                                                        <div key={cIdx} style={{
+                                                            background: 'white', padding: '20px', borderRadius: '20px',
+                                                            border: '1px solid var(--border)',
+                                                            borderLeft: `6px solid ${isKnown ? '#10b981' : '#f59e0b'}`,
+                                                            display: 'flex', flexDirection: 'column', gap: '12px'
                                                         }}>
-                                                            {opt}
-                                                            {oIdx === q.correct_index && <CheckCircle2 size={18} />}
-                                                            {oIdx === q.user_answer && oIdx !== q.correct_index && <XCircle size={18} />}
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>CARD {cIdx + 1}</span>
+                                                                <span style={{
+                                                                    fontSize: '0.7rem', fontWeight: 800,
+                                                                    color: isKnown ? '#10b981' : '#b45309',
+                                                                    background: isKnown ? '#f0fdf4' : '#fffbeb',
+                                                                    padding: '4px 8px', borderRadius: '100px'
+                                                                }}>
+                                                                    {isKnown ? 'Mastered' : 'Review Again'}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>{card.front}</p>
+                                                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{card.back}</p>
+                                                            </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div style={{ display: 'flex', gap: '20px', marginBottom: '16px' }}>
-                                                    <div style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '4px' }}>YOUR ANSWER</div>
-                                                        <div style={{ fontWeight: 700, color: q.user_answer === q.correct_answer ? '#10b981' : '#f43f5e' }}>
-                                                            {q.user_answer ? 'True' : 'False'}
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '4px' }}>CORRECT KEY</div>
-                                                        <div style={{ fontWeight: 700, color: '#10b981' }}>
-                                                            {q.correct_answer ? 'True' : 'False'}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '12px', fontSize: '0.9rem', color: '#475569', lineHeight: 1.6 }}>
-                                                <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.75rem', color: '#64748b' }}>EXPLANATION & CONTEXT</strong>
-                                                {q.explanation}
+                                                    );
+                                                })}
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        ) : (
+                                            <div style={{
+                                                gridColumn: '1 / -1', padding: '32px', textAlign: 'center',
+                                                background: 'white', borderRadius: '24px', border: '1px solid var(--border)'
+                                            }}>
+                                                <History size={32} color="var(--border)" style={{ marginBottom: '12px' }} />
+                                                <p style={{ color: 'var(--text-muted)' }}>
+                                                    Study session completed with <strong>{selectedAttempt.metadata?.known_count || 0}</strong> known cards
+                                                    and <strong>{selectedAttempt.metadata?.review_count || 0}</strong> cards marked for review.
+                                                </p>
+                                                <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '8px' }}>Detailed card history is only available for sessions completed after the last update.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    selectedAttempt.questions.map((q, idx) => {
+                                        const isCorrect = selectedAttempt.type === 'quiz'
+                                            ? q.user_answer === q.correct_index
+                                            : q.user_answer === q.correct_answer;
+
+                                        return (
+                                            <div key={idx} style={{
+                                                background: 'white',
+                                                borderRadius: '20px',
+                                                padding: '24px',
+                                                border: '1px solid var(--border)',
+                                                borderLeft: `6px solid ${isCorrect ? '#10b981' : '#f43f5e'}`
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-muted)' }}>QUESTION {idx + 1}</span>
+                                                    <div style={{
+                                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                                        fontSize: '0.8rem', fontWeight: 700,
+                                                        color: isCorrect ? '#10b981' : '#f43f5e',
+                                                        background: isCorrect ? '#f0fdf4' : '#fef2f2',
+                                                        padding: '4px 10px', borderRadius: '100px'
+                                                    }}>
+                                                        {isCorrect ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                                                        {isCorrect ? 'Correct' : 'Incorrect'}
+                                                    </div>
+                                                </div>
+
+                                                <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1e293b', marginBottom: '20px', lineHeight: 1.5 }}>
+                                                    {selectedAttempt.type === 'quiz' ? q.question : q.statement}
+                                                </p>
+
+                                                {selectedAttempt.type === 'quiz' ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                                                        {q.options.map((opt, oIdx) => (
+                                                            <div key={oIdx} style={{
+                                                                padding: '12px 16px',
+                                                                borderRadius: '12px',
+                                                                fontSize: '0.95rem',
+                                                                border: '1px solid',
+                                                                display: 'flex',
+                                                                justifyContent: 'space-between',
+                                                                alignItems: 'center',
+                                                                borderColor: oIdx === q.correct_index
+                                                                    ? '#10b981'
+                                                                    : (oIdx === q.user_answer ? '#f43f5e' : '#e2e8f0'),
+                                                                background: oIdx === q.correct_index
+                                                                    ? '#f0fdf4'
+                                                                    : (oIdx === q.user_answer ? '#fef2f2' : 'white'),
+                                                                color: oIdx === q.correct_index
+                                                                    ? '#065f46'
+                                                                    : (oIdx === q.user_answer ? '#991b1b' : '#64748b'),
+                                                                fontWeight: (oIdx === q.correct_index || oIdx === q.user_answer) ? 700 : 400
+                                                            }}>
+                                                                {opt}
+                                                                {oIdx === q.correct_index && <CheckCircle2 size={18} />}
+                                                                {oIdx === q.user_answer && oIdx !== q.correct_index && <XCircle size={18} />}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', gap: '20px', marginBottom: '16px' }}>
+                                                        <div style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '4px' }}>YOUR ANSWER</div>
+                                                            <div style={{ fontWeight: 700, color: q.user_answer === q.correct_answer ? '#10b981' : '#f43f5e' }}>
+                                                                {q.user_answer ? 'True' : 'False'}
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '4px' }}>CORRECT KEY</div>
+                                                            <div style={{ fontWeight: 700, color: '#10b981' }}>
+                                                                {q.correct_answer ? 'True' : 'False'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '12px', fontSize: '0.9rem', color: '#475569', lineHeight: 1.6 }}>
+                                                    <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.75rem', color: '#64748b' }}>EXPLANATION & CONTEXT</strong>
+                                                    {q.explanation}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         </motion.section>
                     )}

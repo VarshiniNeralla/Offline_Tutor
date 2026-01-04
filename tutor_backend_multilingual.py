@@ -1021,6 +1021,134 @@ SUMMARY OUTPUT:"""
 
         return response, [], "summary"
 
+    def generate_flashcards_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
+        """Generates a list of high-quality flashcards from textbook context."""
+        print(f"🗂️ Generating Flashcards: {question[:60]}...")
+        flash_start = time.time()
+
+        # 1. Search for broader context to get enough cards
+        filter_dict = None
+        if selected_books:
+            filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects:
+            filter_dict = {"subject": {"$in": selected_subjects}}
+
+        try:
+            # We take k=20 for a better variety of cards and higher chance of meeting target count
+            relevant_docs = self.vectorstore.similarity_search(question, k=20, filter=filter_dict)
+            context = "\n\n".join([doc.page_content for doc in relevant_docs])
+        except Exception as e:
+            print(f"⚠️ Vector search failed for Flashcards: {e}")
+            return [], [], "error"
+
+        # 2. Extract card count from question if provided (e.g. "Generate 20 cards")
+        card_count = 10
+        import re
+        match = re.search(r'(\d+)', question)
+        if match:
+            card_count = int(match.group(1))
+        
+        # Limit count for local AI stability
+        card_count = min(max(card_count, 5), 30)
+
+        # 3. Multi-Pass Strategy: Generate in batches of 5
+        batch_size = 5
+        all_flashcards = []
+        num_passes = (card_count + batch_size - 1) // batch_size
+        
+        print(f"🌀 Flashcards Multi-Pass: {num_passes} passes for {card_count} total cards...")
+
+        for pass_idx in range(num_passes):
+            current_batch_count = min(batch_size, card_count - len(all_flashcards))
+            
+            # Sub-retry loop for this specific pass
+            max_pass_retries = 2
+            for retry_idx in range(max_pass_retries):
+                print(f"🌀 Flashcards Pass {pass_idx + 1}/{num_passes} (Attempt {retry_idx + 1}/{max_pass_retries}) for {current_batch_count} cards...")
+
+                prompt = f"""### INSTRUCTION:
+You are an expert educational content creator. Your task is to generate {current_batch_count} unique, high-quality flashcards based ONLY on the provided textbook context.
+
+### GUIDELINES:
+- Focus on key definitions, processes, facts, and exam-oriented concepts.
+- Avoid repeating facts from previous cards: {", ".join([c['front'][:30] for c in all_flashcards[-5:]]) if all_flashcards else "None"}
+- Each card must have a "front" (question/term), a "back" (answer/definition), and a "hint" (short clue).
+- Set "importance" to "high", "medium", or "low" based on how critical the fact is.
+- Response MUST be a valid JSON array of objects.
+- Do NOT include any intro or outro text.
+
+### OUTPUT FORMAT (STRICT JSON):
+[
+  {{
+    "id": 1,
+    "front": "What is the powerhouse of the cell?",
+    "back": "Mitochondria",
+    "hint": "Cell organelle",
+    "importance": "high"
+  }}
+]
+
+### TEXTBOOK CONTEXT:
+{context[:6000]}
+
+### FLASHCARDS OUTPUT:"""
+
+                # Call AI for this batch
+                response_text = self.call_llama_optimized(prompt, num_predict=1500, temperature=0.1)
+                
+                # Parse JSON with robustness for this batch
+                try:
+                    # 1. Basic cleaning
+                    clean_text = response_text.strip()
+                    if "```json" in clean_text:
+                        clean_text = clean_text.split("```json")[-1].split("```")[0]
+                    elif "```" in clean_text:
+                        clean_text = clean_text.split("```")[-1].split("```")[0]
+                    
+                    start_idx = clean_text.find('[')
+                    end_idx = clean_text.rfind(']')
+                    
+                    if start_idx != -1 and end_idx != -1:
+                        json_blob = clean_text[start_idx:end_idx+1]
+                        
+                        # 2. JSON Repair Logic (handle common LLM mistakes)
+                        import re
+                        # Remove trailing commas
+                        json_blob = re.sub(r',\s*([\]}])', r'\1', json_blob)
+                        # Add missing commas between objects: } { -> }, {
+                        json_blob = re.sub(r'}\s*{', '}, {', json_blob)
+                        # Add missing commas between key-value pairs or values: "v" "k" -> "v", "k"
+                        json_blob = re.sub(r'"\s+"', '", "', json_blob)
+                        
+                        import json
+                        batch_cards = json.loads(json_blob)
+                        
+                        # 3. Validation & Integration
+                        pass_success = False
+                        for card in batch_cards:
+                            if isinstance(card, dict) and 'front' in card and 'back' in card:
+                                card['id'] = len(all_flashcards) + 1
+                                all_flashcards.append(card)
+                                pass_success = True
+                        
+                        if pass_success:
+                            break # Success! Exit retry loop
+                    else:
+                        print(f"⚠️ Attempt {retry_idx+1}: No JSON array found.")
+                except Exception as e:
+                    print(f"❌ Attempt {retry_idx+1}: JSON Parse failed: {e}")
+                    if retry_idx == max_pass_retries - 1:
+                        print(f"🔻 Giving up on Pass {pass_idx+1} after {max_pass_retries} attempts.")
+
+        flash_duration = time.time() - flash_start
+        print(f"⏱️ Total Flashcards generation completed in {flash_duration:.2f}s")
+        print(f"✅ Generated {len(all_flashcards)} valid cards")
+
+        if not all_flashcards:
+            return [], [], "error"
+
+        return all_flashcards, [], "flashcards"
+
     def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None, mode: str = None):
         """SMART response routing with book-level scoping and intent-based optimization."""
         print(f"🧠 Processing question: {question[:50]}...")
@@ -1034,6 +1162,8 @@ SUMMARY OUTPUT:"""
             return self.generate_keywords_response(question, selected_subjects, selected_books)
         if mode == "truefalse":
             return self.generate_true_false_response(question, selected_subjects, selected_books)
+        if mode == "flashcards":
+            return self.generate_flashcards_response(question, selected_subjects, selected_books)
 
         # STEP 1: Detect Intent (Brevity vs Elaboration)
         if not mode:
