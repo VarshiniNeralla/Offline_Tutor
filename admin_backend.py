@@ -60,7 +60,7 @@ class AITextbookAdminBackendOffline:
         """Check Ollama availability with memory-safe fallback order"""
         print("🤖 Checking local AI availability...")
         # Consistent with tutor backend for 8GB RAM stability
-        fallback_order = ['phi3', 'phi', 'llama3.2', 'llama3.1', 'mistral', 'llama3']
+        fallback_order = ['qwen2.5:1.5b', 'llama3.2:1b', 'phi3:mini', 'phi3', 'llama3.2', 'mistral']
         try:
             response = requests.get("http://localhost:11434/api/tags", timeout=3)
             if response.status_code == 200:

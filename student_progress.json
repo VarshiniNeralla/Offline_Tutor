@@ -350,5 +350,276 @@
         },
         "attempt_id": "cd32e33f-b811-48e4-a183-6585f8655d1b",
         "timestamp": "2026-01-04T18:49:26.517619"
+    },
+    {
+        "type": "oral_test",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 13,
+        "total_questions": 3,
+        "status": "REVIEWED",
+        "metadata": {
+            "mode": "practice",
+            "questions": [
+                {
+                    "id": 1,
+                    "question": "What are the primary functions of oceans and continents in relation to marine life?",
+                    "sample_answer": "Oceans support all kinds of marine life by providing a habitat for various species. They play a critical role in regulating Earth's climate.",
+                    "audio_url": "/api/oral_audio/34b68c1c-e53c-4033-aa33-eca3002dbc73/q_0.webm",
+                    "score": 3,
+                    "feedback": ""
+                },
+                {
+                    "id": 2,
+                    "question": "How do oceans and continents impact human life on Earth?",
+                    "sample_answer": "Oceans are essential for supplying the blood with oxygen through marine photosynthesis. Continents provide land-based resources necessary for survival.",
+                    "audio_url": "/api/oral_audio/34b68c1c-e53c-4033-aa33-eca3002dbc73/q_1.webm",
+                    "score": 5,
+                    "feedback": ""
+                },
+                {
+                    "id": 3,
+                    "question": "What is a continent and how does it differ from an ocean?",
+                    "sample_answer": "A continent is a large continuous expanse of landmass. Oceans are vast bodies of saline water covering most of Earth's surface.",
+                    "audio_url": "/api/oral_audio/34b68c1c-e53c-4033-aa33-eca3002dbc73/q_2.webm",
+                    "score": 5,
+                    "feedback": ""
+                }
+            ],
+            "start_time": "Wed 01/07/2026"
+        },
+        "attempt_id": "34b68c1c-e53c-4033-aa33-eca3002dbc73",
+        "timestamp": "2026-01-07T22:01:26.325098"
+    },
+    {
+        "type": "oral_test",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "bdb1fde8-f1ea-4eff-9f12-ed2d4a2aaabc",
+        "book_name": "Locating Places on the Earth",
+        "score": 0,
+        "total_questions": 1,
+        "status": "AI_REVIEWED",
+        "metadata": {
+            "mode": "practice",
+            "questions": [
+                {
+                    "id": 1,
+                    "question": "What is the primary function of the respiratory system?",
+                    "sample_answer": "The primary function of the respiratory system is to supply the blood with oxygen in order for the blood to deliver oxygen to all parts of the body.",
+                    "type": "explanation",
+                    "audio_url": "/api/oral_audio/6180fa18-afa8-4630-af2d-62a60b697f31/q_0.webm",
+                    "transcript": "",
+                    "ai_analysis": {
+                        "score": 1,
+                        "feedback": "No clear response detected in the audio.",
+                        "confidence": "high",
+                        "keywords_detected": []
+                    }
+                }
+            ],
+            "start_time": "Wed 01/07/2026",
+            "ai_reviewed": true
+        },
+        "attempt_id": "6180fa18-afa8-4630-af2d-62a60b697f31",
+        "timestamp": "2026-01-07T23:03:20.039725"
+    },
+    {
+        "type": "oral_test",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "bdb1fde8-f1ea-4eff-9f12-ed2d4a2aaabc",
+        "book_name": "Locating Places on the Earth",
+        "score": 0,
+        "total_questions": 3,
+        "status": "AI_REVIEWED",
+        "metadata": {
+            "mode": "practice",
+            "questions": [
+                {
+                    "id": 1,
+                    "question": "How do we determine a specific location on Earth using latitude and longitude?",
+                    "sample_answer": "Latitude and longitude are coordinates that allow us to pinpoint any point on the Earth's surface. By combining these two measurements, we can locate places precisely.",
+                    "type": "explanation",
+                    "audio_url": "/api/oral_audio/e4f48646-7a9e-4ea8-ab83-80fdfeefb7c4/q_0.webm",
+                    "transcript": "So, to determine a specific location on Earth, we use an imaginary grid system of geographic  coordinates called latitude and longitude, latitude measures the angular distance north  or south of the equator, while longitude measures the distance east or west of the prime  meridian and greenwich.  So, every point on the planet has a unique address formed by the intersection of one specific horizontal  latitude line and one vertical longitude line by identifying where these two lines cross  off and down to precise mid chance seconds, we can pinpoint any exact spot on a map",
+                    "ai_analysis": {
+                        "score": 4,
+                        "feedback": "Your response is quite accurate and complete. You correctly identified that latitude measures north-south distance from the equator, while longitude measures east-west distance from the prime meridian.",
+                        "confidence": "high",
+                        "keywords_detected": [
+                            "latitude",
+                            "longitude",
+                            "imaginary grid system",
+                            "geographic coordinates",
+                            "angular distance",
+                            "prime meridian",
+                            "Greenwich",
+                            "horizontal latitude line",
+                            "vertical longitude line",
+                            "intersection of lines",
+                            "precise midpoint"
+                        ]
+                    }
+                },
+                {
+                    "id": 2,
+                    "question": "How do we determine a specific location on Earth using latitude and longitude?",
+                    "sample_answer": "Latitude and longitude are coordinates that help pinpoint any point on the Earth's surface. By combining these two measurements, we can locate places accurately.",
+                    "type": "explanation",
+                    "audio_url": "/api/oral_audio/e4f48646-7a9e-4ea8-ab83-80fdfeefb7c4/q_1.webm",
+                    "transcript": "It's just the same question.",
+                    "ai_analysis": {
+                        "score": 2,
+                        "feedback": "The student's response is partially correct but lacks depth and completeness.",
+                        "confidence": "medium",
+                        "keywords_detected": [
+                            "latitude",
+                            "longitude"
+                        ]
+                    }
+                },
+                {
+                    "id": 3,
+                    "question": "How do we determine a specific location on Earth using latitude and longitude?",
+                    "sample_answer": "Latitude and longitude are coordinates that allow us to pinpoint any point on the Earth's surface. By combining these two measurements, we can locate places accurately.",
+                    "type": "explanation",
+                    "audio_url": "/api/oral_audio/e4f48646-7a9e-4ea8-ab83-80fdfeefb7c4/q_2.webm",
+                    "transcript": "Same question again.",
+                    "ai_analysis": {
+                        "score": 2,
+                        "feedback": "The student's response is accurate but lacks completeness and uses fewer keywords compared to the canonical answer.",
+                        "confidence": "medium",
+                        "keywords_detected": [
+                            "latitude",
+                            "longitude"
+                        ]
+                    }
+                }
+            ],
+            "start_time": "Wed 01/07/2026",
+            "ai_reviewed": true
+        },
+        "attempt_id": "e4f48646-7a9e-4ea8-ab83-80fdfeefb7c4",
+        "timestamp": "2026-01-07T23:18:33.827563"
+    },
+    {
+        "type": "oral_test",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 0,
+        "total_questions": 3,
+        "status": "IN_PROGRESS",
+        "metadata": {
+            "mode": "practice",
+            "questions": [
+                {
+                    "id": 1,
+                    "question": "What are the definitions of continents, oceans, and islands?",
+                    "sample_answer": "Continents are large landmasses on Earth's surface that are separated by bodies of water. Oceans encompass vast areas of saltwater covering most of the planet. Islands are smaller landforms located within or near an ocean.",
+                    "type": "explanation",
+                    "audio_url": "/api/oral_audio/de228106-558b-4b95-821a-34d435ba9794/q_0.webm"
+                },
+                {
+                    "id": 2,
+                    "question": "What are the definitions of continents and oceans, and how do they differ from islands?",
+                    "sample_answer": "Continents are large landmasses that make up most of Earth's surface. They are defined by their size and shape, typically being larger than countries or other smaller landforms like islands. Oceans, on the other hand, are vast bodies of saltwater covering about two-thirds of Earth’s surface. Islands are small land masses surrounded by water, often forming part of a continent.",
+                    "type": "explanation"
+                },
+                {
+                    "id": 3,
+                    "question": "What are the definitions of continents and oceans, and how do they differ?",
+                    "sample_answer": "Continents refer to the larger landmasses on Earth's surface that are separated by bodies of water. They include regions like Africa, Asia, Europe, North America, South America, Antarctica, Australia, and others. Oceans, on the other hand, are vast bodies of saltwater covering most of the planet’s surface area. They are interconnected but distinct from continents.",
+                    "type": "explanation"
+                }
+            ],
+            "start_time": "Wed 01/07/2026"
+        },
+        "attempt_id": "de228106-558b-4b95-821a-34d435ba9794",
+        "timestamp": "2026-01-07T23:34:48.157457"
+    },
+    {
+        "type": "oral_test",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "bdb1fde8-f1ea-4eff-9f12-ed2d4a2aaabc",
+        "book_name": "Locating Places on the Earth",
+        "score": 10,
+        "total_questions": 3,
+        "status": "AI_REVIEWED",
+        "metadata": {
+            "mode": "practice",
+            "questions": [
+                {
+                    "question": "How do you determine your location on a globe, and what does latitude and longitude represent?",
+                    "sample_answer": "To find your location on a globe, you would give directions such as 'Meet me at the 7th shop in the 5th row from the entrance.' This system allows others to precisely locate where you are. Latitude represents the distance from the equator, while longitude indicates the distance east or west from the prime meridian.",
+                    "type": "explanation",
+                    "id": 1,
+                    "audio_url": "/api/oral_audio/678eeeb5-74cc-4a95-aa39-6dfa395a5a3b/q_0.webm",
+                    "transcript": "To determine your location on a globe, you identify the exact intersection point of two imaginary lines, a parallel of latitude and a median of longitude.  Latitude represents your distance north or south of the equator ranging from 0 to 90 and primarily dictates climate zones and longitude represents your distance east or west of the primary region ranging from 0 to 180  and is used to calculate global time zones and by combining these two, you create a unique geographic address that allows tools like Google Maps to pinpoint any specific spot on Earth surface.",
+                    "ai_analysis": {
+                        "score": 4,
+                        "feedback": "Your response is mostly accurate and complete, but it could be more precise.",
+                        "confidence": "medium",
+                        "keywords_detected": [
+                            "intersection point of two imaginary lines",
+                            "parallel of latitude",
+                            "median of longitude",
+                            "latitude represents your distance north or south of the equator",
+                            "longitude represents your distance east or west of the primary region",
+                            "unique geographic address"
+                        ]
+                    }
+                },
+                {
+                    "question": "How do you determine your location on a globe?",
+                    "sample_answer": "To locate a place on Earth using a globe, one would typically use latitude and longitude coordinates. Latitude measures the distance from the Equator, while longitude measures the distance east or west of the Prime Meridian. By combining these two measurements, any specific point can be pinpointed accurately.",
+                    "type": "explanation",
+                    "id": 2,
+                    "audio_url": "/api/oral_audio/678eeeb5-74cc-4a95-aa39-6dfa395a5a3b/q_1.webm",
+                    "transcript": "We simply find intersection of latitude and longitude, that's it.",
+                    "ai_analysis": {
+                        "score": 3,
+                        "feedback": "The student's response is partially correct but lacks depth and completeness. They correctly mention finding an intersection, which is a part of determining location on a globe.",
+                        "confidence": "medium",
+                        "keywords_detected": [
+                            "latitude",
+                            "longitude",
+                            "intersection"
+                        ]
+                    }
+                },
+                {
+                    "question": "How do you determine your location on Earth using coordinates?",
+                    "sample_answer": "To locate a place on Earth, we use latitude and longitude. Latitude measures the distance from the Equator, while longitude measures the distance east or west from the Prime Meridian. Together, these two measurements allow us to pinpoint any specific point on the globe.",
+                    "type": "explanation",
+                    "id": 3,
+                    "audio_url": "/api/oral_audio/678eeeb5-74cc-4a95-aa39-6dfa395a5a3b/q_2.webm",
+                    "transcript": "Determining your location on Earth using coordinates involves pointing a position relative to a global grid of latitude and longitude.",
+                    "ai_analysis": {
+                        "score": 3,
+                        "feedback": "Your response is mostly accurate and complete, but it could be more precise. You correctly mentioned latitude and longitude, which are essential for determining location on Earth.",
+                        "confidence": "medium",
+                        "keywords_detected": [
+                            "latitude",
+                            "longitude"
+                        ]
+                    }
+                }
+            ],
+            "start_time": "Wed 01/07/2026",
+            "ai_reviewed": true
+        },
+        "attempt_id": "678eeeb5-74cc-4a95-aa39-6dfa395a5a3b",
+        "timestamp": "2026-01-07T23:46:12.679538"
     }
 ]

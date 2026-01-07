@@ -217,6 +217,8 @@ const StudentDashboard = () => {
                                     navigate("/truefalse", { state: toolState });
                                 } else if (toolType === 'flashcards') {
                                     navigate("/flashcards", { state: toolState });
+                                } else if (toolType === 'oral') {
+                                    navigate("/oraltest", { state: toolState });
                                 } else {
                                     navigate("/chat", {
                                         state: {

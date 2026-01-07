@@ -380,7 +380,7 @@ JSON Output:"""
         """Check local Ollama availability with memory-safe fallback order"""
         print("🤖 Checking local AI availability...")
         # Lighter models prioritized for 8GB RAM stability
-        fallback_order = ['phi3', 'phi', 'llama3.2', 'llama3.1', 'mistral', 'llama3']
+        fallback_order = ['qwen2.5:1.5b', 'llama3.2:1b', 'phi3:mini', 'phi3', 'llama3.2', 'mistral']
         try:
             response = requests.get("http://localhost:11434/api/tags", timeout=3)
             if response.status_code == 200:
@@ -923,7 +923,7 @@ JSON OUTPUT:"""
                 "options": {
                     "temperature": temperature,
                     "num_predict": num_predict,
-                    "num_ctx": 8192 # Increased for higher safety margin
+                    "num_ctx": 4096 # 4096 is safe for 1.5B/3B models on 8GB RAM.
                 }
             }
             if format:
@@ -1149,6 +1149,304 @@ You are an expert educational content creator. Your task is to generate {current
 
         return all_flashcards, [], "flashcards"
 
+    def generate_oral_test_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
+        """Generates a structured list of questions for an oral exam from textbook context."""
+        print(f"🎙️ Generating Oral Test Questions: {question[:60]}...")
+        oral_start = time.time()
+
+        # 1. Broad context search
+        filter_dict = None
+        if selected_books:
+            filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects:
+            filter_dict = {"subject": {"$in": selected_subjects}}
+
+        try:
+            relevant_docs = self.vectorstore.similarity_search(question, k=15, filter=filter_dict)
+            context = "\n\n".join([doc.page_content for doc in relevant_docs])
+            
+            if not context or len(context.strip()) < 100:
+                print("⚠️ Insufficient context found for Oral Test questions.")
+                return [], [], "error"
+        except Exception as e:
+            print(f"⚠️ Vector search failed for Oral Test: {e}")
+            return [], [], "error"
+
+        # 2. Extract question count
+        q_count = 5
+        import re
+        match = re.search(r'(\d+)', question)
+        if match:
+            q_count = int(match.group(1))
+        
+        q_count = min(max(q_count, 3), 15) # Limit for stability
+
+        # 3. Generation Logic (Single or Two-Pass depending on count)
+        all_questions = []
+        batch_size = 5
+        num_passes = (q_count + batch_size - 1) // batch_size
+
+        for pass_idx in range(num_passes):
+            current_batch_count = min(batch_size, q_count - len(all_questions))
+            
+            # Sub-retry loop for this specific pass
+            max_pass_retries = 3 # Increased retries
+            for retry_idx in range(max_pass_retries):
+                # Clean prompt to remove starting "3 " or similar counts
+                topic_hint = re.sub(r'^\d+\s*', '', question.replace("Generate ", "").replace("oral test questions for ", "").strip())
+                
+                print(f"🌀 Oral Test Pass {pass_idx + 1}/{num_passes} (Attempt {retry_idx + 1}/{max_pass_retries}) for {current_batch_count} questions (Topic: {topic_hint})")
+
+                prompt = f"""### SYSTEM:
+You are an academic examiner. Generate ONLY from the context.
+NO Biology/Science if context is Geography.
+
+### INSTRUCTION:
+Generate {current_batch_count} DIFFERENT questions about: "{topic_hint}".
+Base them ONLY on the TEXTBOOK CONTEXT below.
+
+### CONSTRAINTS:
+- Count: Exactly {current_batch_count} questions.
+- Uniqueness: Each must cover a different fact. 
+- Format: JSON array.
+
+### TEXTBOOK CONTEXT:
+{context[:4000]}
+
+### ORAL TEST QUESTIONS OUTPUT (JSON):"""
+
+                response_text = self.call_llama_optimized(prompt, num_predict=800, temperature=0.1, format="json") # Reduced from 2000, added format="json"
+                
+                try:
+                    # Robust JSON extraction
+                    import json
+                    import re
+                    
+                    json_data = None
+                    try:
+                        # Attempt 1: Direct parse
+                        json_data = json.loads(response_text)
+                    except:
+                        # Attempt 2: Extract block
+                        start_idx = response_text.find('[')
+                        end_idx = response_text.rfind(']')
+                        if start_idx != -1 and end_idx != -1:
+                            json_blob = response_text[start_idx:end_idx+1]
+                            json_data = json.loads(json_blob)
+                        else:
+                            # Attempt 3: Look for object if no list
+                            start_obj = response_text.find('{')
+                            end_obj = response_text.rfind('}')
+                            if start_obj != -1 and end_obj != -1:
+                                json_blob = response_text[start_obj:end_obj+1]
+                                json_data = json.loads(json_blob)
+                    
+                    if json_data:
+                        # Normalize to list
+                        batch_qs = []
+                        if isinstance(json_data, list):
+                            batch_qs = json_data
+                        elif isinstance(json_data, dict):
+                            # Handle common patterns like {"questions": [...]} or {"oral_test": [...]}
+                            for key in ["questions", "oral_test", "data", "result"]:
+                                if key in json_data and isinstance(json_data[key], list):
+                                    batch_qs = json_data[key]
+                                    break
+                            if not batch_qs:
+                                # Could be a single object
+                                if 'question' in json_data:
+                                    batch_qs = [json_data]
+
+                        # Validation & Integration
+                        pass_success = False
+                        new_batch = []
+                        # Pre-calculate normalized forms of existing questions for efficiency
+                        seen_norms = {re.sub(r'[^\w\s]', '', prev['question'].lower().strip()) for prev in all_questions}
+
+                        for q in batch_qs:
+                            if isinstance(q, dict) and 'question' in q and 'sample_answer' in q:
+                                # Stricter duplicate check: ignore case and punctuation
+                                q_norm = re.sub(r'[^\w\s]', '', q['question'].lower().strip())
+                                # Check against already saved questions AND currently adding ones
+                                pending_norms = {re.sub(r'[^\w\s]', '', p['question'].lower().strip()) for p in new_batch}
+                                
+                                if q_norm in seen_norms or q_norm in pending_norms:
+                                    print(f"⚠️ Redundant question ignored in pass: {q['question'][:30]}...")
+                                    continue
+                                    
+                                q['id'] = len(all_questions) + len(new_batch) + 1
+                                new_batch.append(q)
+                        
+                        if new_batch:
+                            all_questions.extend(new_batch)
+                            pass_success = True
+                        
+                        if pass_success:
+                            if len(batch_qs) < current_batch_count:
+                                print(f"⚠️ AI generated only {len(batch_qs)}/{current_batch_count} questions. Retrying pass...")
+                                pass_success = False
+                                # Continue to next retry_idx
+                            else:
+                                break # Success! Exit retry loop
+                        else:
+                            print(f"⚠️ Pass {pass_idx+1}, Attempt {retry_idx+1}: Valid JSON but missing required fields.")
+                    else:
+                        print(f"⚠️ Pass {pass_idx+1}, Attempt {retry_idx+1}: Could not find JSON in response.")
+                        print(f"DEBUG RAW RESPONSE: {response_text[:200]}...")
+                except Exception as e:
+                    print(f"❌ JSON Parse failed in Oral Test Pass {pass_idx+1}, Attempt {retry_idx+1}: {e}")
+                    # print(f"DEBUG RAW RESPONSE: {response_text[:200]}...")
+
+            # --- FALLBACK: If batch generation failed to reach count, generate one-by-one ---
+            remaining_to_fill = current_batch_count - len(new_batch)
+            if remaining_to_fill > 0:
+                print(f"🔄 Pass {pass_idx+1} incomplete ({len(new_batch)}/{current_batch_count}). Falling back to one-by-one generation for {remaining_to_fill} questions...")
+                for f_idx in range(remaining_to_fill):
+                    print(f"   🔹 Generating individual fallback question {f_idx + 1}/{remaining_to_fill}...")
+                    
+                    fallback_prompt = f"""### SYSTEM:
+Academic examiner. Topic: {topic_hint}. Context ONLY.
+AVOID repeating: {", ".join([q['question'][:30] for q in all_questions + new_batch]) if (all_questions or new_batch) else "None"}
+
+### INSTRUCTION:
+Generate ONE unique oral exam question about: "{topic_hint}".
+Base it ONLY on the TEXTBOOK CONTEXT.
+
+### FORMAT:
+{{
+  "question": "[Unique question]",
+  "sample_answer": "[Canonical answer]",
+  "type": "explanation"
+}}
+
+### TEXTBOOK CONTEXT:
+{context[:3000]}
+
+### OUTPUT (JSON OBJECT ONLY):"""
+                    
+                    try:
+                        f_response = self.call_llama_optimized(fallback_prompt, num_predict=300, temperature=0.3, format="json")
+                        # Simple extract object
+                        s = f_response.find('{')
+                        e_idx = f_response.rfind('}')
+                        if s != -1 and e_idx != -1:
+                            f_item = json.loads(f_response[s:e_idx+1])
+                            if 'question' in f_item and 'sample_answer' in f_item:
+                                f_item['id'] = len(all_questions) + 1
+                                all_questions.append(f_item)
+                                print(f"   ✅ Fallback question generated successfully.")
+                    except Exception as fe:
+                        print(f"   ❌ Fallback failed: {fe}")
+
+        oral_duration = time.time() - oral_start
+        print(f"⏱️ Total Oral Test generation completed in {oral_duration:.2f}s")
+        
+        if not all_questions:
+            return [], [], "error"
+
+        return all_questions, [], "oral_test"
+
+    def transcribe_file(self, audio_path):
+        """Transcribe an audio file using the local Whisper model."""
+        if not hasattr(self, 'whisper_model') or self.whisper_model is None:
+            self.setup_telugu_asr_offline()
+        
+        if not self.asr_available:
+            return None, "ASR not available"
+            
+        try:
+            print(f"🎤 Transcribing audio: {audio_path}")
+            # Use English if not specified, but Whisper detects automatically
+            segments, info = self.whisper_model.transcribe(audio_path, beam_size=5)
+            transcript = " ".join([segment.text for segment in segments]).strip()
+            print(f"📄 Transcription complete: {transcript[:50]}...")
+            return transcript, None
+        except Exception as e:
+            print(f"❌ Transcription error: {e}")
+            return None, str(e)
+
+    def analyze_oral_transcript(self, question, sample_answer, transcript):
+        """AI Auto-Review of Oral Test transcript using LLM comparison."""
+        if not transcript or len(transcript.strip()) < 2:
+            return {
+                "score": 1,
+                "feedback": "No clear response detected in the audio.",
+                "confidence": "high",
+                "keywords_detected": []
+            }
+
+        # Step 1: Extract Keywords from Sample Answer for Coverage Analysis (Internal LLM step or simple regex)
+        # We'll ask the LLM to do it as part of the main analysis for efficiency
+        
+        prompt = f"""### INSTRUCTION:
+You are an expert oral exam reviewer. Your task is to evaluate a student's spoken response (transcript) against a canonical sample answer.
+
+### EVALUATION CRITERIA:
+1. Accuracy: Does the transcript contain the correct information?
+2. Completeness: Were the key concepts from the sample answer mentioned?
+3. Keywords: Did the student use the essential terms?
+
+### INPUT:
+- QUESTION: {question}
+- CANONICAL ANSWER: {sample_answer}
+- STUDENT TRANSCRIPT: {transcript}
+
+### OUTPUT FORMAT (STRICT JSON):
+{{
+  "score": (Integer 1-5),
+  "feedback": (Short, encouraging feedback string),
+  "confidence": ("low" | "medium" | "high"),
+  "keywords_detected": [List of key terms found in the transcript]
+}}
+
+### ANALYSIS:"""
+
+        try:
+            response_text = self.call_llama_optimized(prompt, num_predict=1000, temperature=0.1)
+            
+            # Robust JSON extraction
+            import json
+            import re
+            
+            clean_text = response_text.strip()
+            # Handle markdown code blocks
+            if "```json" in clean_text:
+                clean_text = clean_text.split("```json")[-1].split("```")[0]
+            elif "```" in clean_text:
+                clean_text = clean_text.split("```")[-1].split("```")[0]
+            
+            start_idx = clean_text.find('{')
+            end_idx = clean_text.rfind('}')
+            
+            if start_idx != -1 and end_idx != -1:
+                json_blob = clean_text[start_idx:end_idx+1]
+                # Repair trailing commas and other common issues
+                json_blob = re.sub(r',\s*([\]}])', r'\1', json_blob)
+                analysis = json.loads(json_blob)
+                
+                # Validation
+                if 'score' not in analysis: analysis['score'] = 3
+                if 'feedback' not in analysis: analysis['feedback'] = "Review complete."
+                if 'confidence' not in analysis: analysis['confidence'] = "medium"
+                if 'keywords_detected' not in analysis: analysis['keywords_detected'] = []
+                
+                return analysis
+            else:
+                return {
+                    "score": 3,
+                    "feedback": "AI was unable to generate a detailed review, but the response was recorded.",
+                    "confidence": "low",
+                    "keywords_detected": []
+                }
+        except Exception as e:
+            print(f"❌ AI Analysis error: {e}")
+            return {
+                "score": 0,
+                "feedback": f"Review engine error: {str(e)}",
+                "confidence": "low",
+                "keywords_detected": []
+            }
+
     def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None, mode: str = None):
         """SMART response routing with book-level scoping and intent-based optimization."""
         print(f"🧠 Processing question: {question[:50]}...")
@@ -1164,6 +1462,8 @@ You are an expert educational content creator. Your task is to generate {current
             return self.generate_true_false_response(question, selected_subjects, selected_books)
         if mode == "flashcards":
             return self.generate_flashcards_response(question, selected_subjects, selected_books)
+        if mode == "oral_test":
+            return self.generate_oral_test_response(question, selected_subjects, selected_books)
 
         # STEP 1: Detect Intent (Brevity vs Elaboration)
         if not mode:
