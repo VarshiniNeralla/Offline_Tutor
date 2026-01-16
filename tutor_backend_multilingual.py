@@ -1206,9 +1206,10 @@ Generate {current_batch_count} DIFFERENT questions about: "{topic_hint}".
 Base them ONLY on the TEXTBOOK CONTEXT below.
 
 ### CONSTRAINTS:
-- Count: Exactly {current_batch_count} questions.
-- Uniqueness: Each must cover a different fact. 
-- Format: JSON array.
+- Topic: {topic_hint}
+- Diversify: Covered topics so far: {", ".join([q['question'][:30] for q in all_questions]) if all_questions else "None"}. Do NOT repeat these.
+- Focus: Pick {current_batch_count} DIFFERENT facts/terms from the context.
+- Uniqueness: Each question must have a unique answer.
 
 ### TEXTBOOK CONTEXT:
 {context[:4000]}
@@ -1265,13 +1266,22 @@ Base them ONLY on the TEXTBOOK CONTEXT below.
 
                         for q in batch_qs:
                             if isinstance(q, dict) and 'question' in q and 'sample_answer' in q:
-                                # Stricter duplicate check: ignore case and punctuation
+                                # Normalization for duplicate detection
                                 q_norm = re.sub(r'[^\w\s]', '', q['question'].lower().strip())
-                                # Check against already saved questions AND currently adding ones
-                                pending_norms = {re.sub(r'[^\w\s]', '', p['question'].lower().strip()) for p in new_batch}
+                                a_norm = q['sample_answer'].lower().strip()[:40] # Check first 40 chars of answer
                                 
-                                if q_norm in seen_norms or q_norm in pending_norms:
-                                    print(f"⚠️ Redundant question ignored in pass: {q['question'][:30]}...")
+                                # Check against already saved questions AND currently adding ones
+                                seen_q_norms = {re.sub(r'[^\w\s]', '', prev['question'].lower().strip()) for prev in all_questions}
+                                seen_a_norms = {prev['sample_answer'].lower().strip()[:40] for prev in all_questions}
+                                pending_q_norms = {re.sub(r'[^\w\s]', '', p['question'].lower().strip()) for p in new_batch}
+                                pending_a_norms = {p['sample_answer'].lower().strip()[:40] for p in new_batch}
+                                
+                                # If question phrasing OR the answer is a duplicate, skip it
+                                if q_norm in seen_q_norms or q_norm in pending_q_norms:
+                                    print(f"⚠️ redundant phrasing: {q['question'][:30]}...")
+                                    continue
+                                if a_norm in seen_a_norms or a_norm in pending_a_norms:
+                                    print(f"⚠️ redundant fact: same answer as previous question.")
                                     continue
                                     
                                 q['id'] = len(all_questions) + len(new_batch) + 1
@@ -1311,6 +1321,7 @@ AVOID repeating: {", ".join([q['question'][:30] for q in all_questions + new_bat
 ### INSTRUCTION:
 Generate ONE unique oral exam question about: "{topic_hint}".
 Base it ONLY on the TEXTBOOK CONTEXT.
+Cover a different fact than: {", ".join([q['question'][:30] for q in all_questions + new_batch]) if (all_questions or new_batch) else "None"}.
 
 ### FORMAT:
 {{
