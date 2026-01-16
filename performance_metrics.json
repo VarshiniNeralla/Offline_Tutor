@@ -166,5 +166,12 @@
     "tokens": 245,
     "time": 139.44,
     "model": "phi3:latest"
+  },
+  {
+    "timestamp": "2026-01-16 18:38:51",
+    "mode": "brief",
+    "tokens": 69,
+    "time": 27.96,
+    "model": "qwen2.5:1.5b"
   }
 ]

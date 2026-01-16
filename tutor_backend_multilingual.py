@@ -306,35 +306,90 @@ JSON:"""
                 current_context = context[p*1500 : (p+1)*1500 + 1000] # Sliding window
                 if not current_context.strip(): current_context = context[:2500]
                 
-                prompt = f"""Extract {pass_q_count} TRUE/FALSE facts from the text as JSON.
-Text: {current_context}
+                # DEDUPLICATION: Tell AI what NOT to generate
+                existing_topics = ", ".join([q.get('statement', '')[:30] for q in all_questions]) if all_questions else "None"
+                
+                prompt = f"""### SYSTEM:
+Strict academic examiner.
+Goal: Extract {pass_q_count} DIFFERENT True/False facts.
+Constraint: DO NOT REPEAT these ideas: {existing_topics}
 
-RULES:
-- BRIEF: Explanations MUST be under 12 words.
-- Format:
+### FORMATTING RULES (CRITICAL):
+1. STATEMENTS MUST BE FULL SENTENCES.
+   - BAD: "Produced by oceans"
+   - GOOD: "Oxygen is produced by oceans."
+2. NO DUPLICATES.
+
+### TEXT:
+{current_context}
+
+### OUTPUT (JSON):
 {{
   "questions": [
     {{
-      "statement": "fact",
+      "statement": "Full sentence fact here.",
       "answer": true/false,
-      "explanation": "why (max 10 words)",
-      "corrected_statement": "if false"
+      "explanation": "Short reason (max 8 words)",
+      "corrected_statement": "Adjustment if false"
     }}
   ]
-}}
-JSON Output:"""
+}}"""
                 
-                response = self.call_llama_optimized(prompt, num_predict=1500, temperature=0.1, format="json")
+                retry_count = 0
+                questions_added_in_pass = 0
+                while questions_added_in_pass < pass_q_count and retry_count < max_retries_per_pass:
+                    # Use phi3:mini for better T/F quality as per user request
+                    response = self.call_llama_optimized(base_prompt, num_predict=1500, temperature=current_temp, format="json", model="phi3:mini")
+                    
+                    try:
+                        # Clean response and parse
+                        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                        if json_match:
+                            parsed = json.loads(json_match.group(0))
+                            if "questions" in parsed:
+                                 # DEDUP FILTER
+                                new_qs = []
+                                for q in parsed["questions"]:
+                                    # Simple duplicate check
+                                    is_dup = False
+                                    for old_q in all_questions:
+                                        if q['statement'].lower().strip() == old_q['statement'].lower().strip():
+                                            is_dup = True
+                                            break
+                                    if not is_dup:
+                                        new_qs.append(q)
+                                
+                                all_questions.extend(new_qs)
+                                questions_added_in_pass += len(new_qs)
+
+                                if len(all_questions) >= q_count: # Hard break if we have enough questions overall
+                                    break
+                                
+                                if questions_added_in_pass == 0:
+                                    print(f"⚠️ No unique questions found in this attempt. Increasing temperature... (Retry {retry_count+1}/{max_retries_per_pass})")
+                                    current_temp = min(current_temp * 1.5, 1.0) # Exponential temperature increase, max 1.0
+                                    retry_count += 1
+                                    # Add a hint to the prompt for more variety
+                                    prompt += "\n\n### IMPORTANT: Please explore DIFFERENT topics than previous questions."
+                                else:
+                                    # Reset temperature and retry count if progress was made
+                                    current_temp = initial_temperature
+                                    retry_count = 0
+                            else:
+                                print(f"⚠️ Pass {p+1} failed to parse JSON (no 'questions' key). Retrying...")
+                                retry_count += 1
+                                current_temp = min(current_temp * 1.5, 1.0)
+                        else:
+                            print(f"⚠️ Pass {p+1} failed to parse JSON (no match). Retrying...")
+                            retry_count += 1
+                            current_temp = min(current_temp * 1.5, 1.0)
+                    except Exception as e:
+                        print(f"⚠️ Pass {p+1} failed to parse JSON: {e}. Retrying...")
+                        retry_count += 1
+                        current_temp = min(current_temp * 1.5, 1.0)
                 
-                try:
-                    # Clean response and parse
-                    json_match = re.search(r'\{.*\}', response, re.DOTALL)
-                    if json_match:
-                        parsed = json.loads(json_match.group(0))
-                        if "questions" in parsed:
-                            all_questions.extend(parsed["questions"])
-                except Exception as e:
-                    print(f"⚠️ Pass {p+1} failed to parse JSON: {e}")
+                if len(all_questions) >= q_count: # Break outer loop if enough questions are generated
+                    break
 
             # 4. Return results
             final_data = {"questions": all_questions[:q_count]}
@@ -912,12 +967,12 @@ JSON OUTPUT:"""
             print(f"📄 Raw response preview: {response[:300]}...")
             return '{"error": "AI response was malformed. Please try again."}', [], "quiz"
 
-    def call_llama_optimized(self, prompt: str, num_predict: int = 1500, temperature: float = 0.1, format: str = None) -> str:
+    def call_llama_optimized(self, prompt: str, num_predict: int = 1500, temperature: float = 0.1, format: str = None, model: str = None) -> str:
         """Specialized LLM call for structured data generation."""
         start_time = time.time()
         try:
             payload = {
-                "model": self.model_name,
+                "model": model if model else self.model_name,
                 "prompt": prompt,
                 "stream": False,
                 "options": {
@@ -943,7 +998,8 @@ JSON OUTPUT:"""
                 eval_count = resp_json.get('eval_count', 0)
                 
                 # Standardized timing/token log
-                print(f"🕒 [{self.model_name}] Generated {eval_count} tokens in {duration:.2f}s using {self.model_name}")
+                used_model = payload.get("model", self.model_name)
+                print(f"🕒 [{used_model}] Generated {eval_count} tokens in {duration:.2f}s")
                 
                 if not text:
                     print(f"⚠️ Ollama returned empty response for model {self.model_name}")
@@ -1034,9 +1090,15 @@ SUMMARY OUTPUT:"""
             filter_dict = {"subject": {"$in": selected_subjects}}
 
         try:
-            # We take k=20 for a better variety of cards and higher chance of meeting target count
-            relevant_docs = self.vectorstore.similarity_search(question, k=20, filter=filter_dict)
-            context = "\n\n".join([doc.page_content for doc in relevant_docs])
+            # Reverting k to 22 for speed balance (25/35 was too slow)
+            relevant_docs = self.vectorstore.similarity_search(question, k=22, filter=filter_dict)
+            base_context_paragraphs = [doc.page_content for doc in relevant_docs]
+            # Verify we have content
+            if not base_context_paragraphs:
+                 return [], [], "error"
+            
+            # Full context for reference
+            full_context_str = "\n\n".join(base_context_paragraphs)
         except Exception as e:
             print(f"⚠️ Vector search failed for Flashcards: {e}")
             return [], [], "error"
@@ -1051,97 +1113,142 @@ SUMMARY OUTPUT:"""
         # Limit count for local AI stability
         card_count = min(max(card_count, 5), 30)
 
-        # 3. Multi-Pass Strategy: Generate in batches of 5
-        batch_size = 5
+        # 3. Robust While-Loop Strategy
         all_flashcards = []
-        num_passes = (card_count + batch_size - 1) // batch_size
+        batch_size = 5
+        # Calculate passes needed, but be willing to add an extra pass if dedup reduces count
+        estimated_passes = (card_count + batch_size - 1) // batch_size
+        max_total_passes = estimated_passes + 2 # Allow 2 extra passes to fill gaps
         
-        print(f"🌀 Flashcards Multi-Pass: {num_passes} passes for {card_count} total cards...")
+        print(f"🌀 Flashcards Generation: Target {card_count} cards (allowing up to {max_total_passes} passes)...")
 
-        for pass_idx in range(num_passes):
-            current_batch_count = min(batch_size, card_count - len(all_flashcards))
+        for pass_idx in range(max_total_passes):
+            if len(all_flashcards) >= card_count:
+                break
+                
+            needed = min(batch_size, card_count - len(all_flashcards))
+            print(f"   🔹 Pass {pass_idx+1}: Need {needed} more (Current: {len(all_flashcards)}/{card_count})")
             
-            # Sub-retry loop for this specific pass
-            max_pass_retries = 2
-            for retry_idx in range(max_pass_retries):
-                print(f"🌀 Flashcards Pass {pass_idx + 1}/{num_passes} (Attempt {retry_idx + 1}/{max_pass_retries}) for {current_batch_count} cards...")
-
-                prompt = f"""### INSTRUCTION:
-You are an expert educational content creator. Your task is to generate {current_batch_count} unique, high-quality flashcards based ONLY on the provided textbook context.
+            # Simple Exclusion List
+            current_excludes = ", ".join([c['front'][:40] for c in all_flashcards]) if all_flashcards else "None"
+            
+            # SHUFFLE STRATEGY (Better than Sliding Window for small texts)
+            # Pass 1: Original Order (Logical flow)
+            # Pass 2+: Random Shuffle (Breaks attention bias to start of text)
+            
+            import random
+            current_paragraphs = base_context_paragraphs[:] # Copy
+            if pass_idx > 0:
+                random.shuffle(current_paragraphs)
+            
+            current_context_text = "\n\n".join(current_paragraphs)
+            
+            prompt = f"""### INSTRUCTION:
+You are an expert educational content creator. Your task is to generate {needed + 2} unique, high-quality flashcards based ONLY on the provided textbook context.
 
 ### GUIDELINES:
-- Focus on key definitions, processes, facts, and exam-oriented concepts.
-- Avoid repeating facts from previous cards: {", ".join([c['front'][:30] for c in all_flashcards[-5:]]) if all_flashcards else "None"}
-- Each card must have a "front" (question/term), a "back" (answer/definition), and a "hint" (short clue).
-- Set "importance" to "high", "medium", or "low" based on how critical the fact is.
-- Response MUST be a valid JSON array of objects.
-- Do NOT include any intro or outro text.
+- Create {needed + 2} distinct cards.
+- Focus on key terms, definitions, and facts.
+- Avoid repeating facts from: {current_excludes}
+- Response MUST be a valid JSON array.
+- Keep definitions SHORT (under 15 words).
 
-### OUTPUT FORMAT (STRICT JSON):
+### TEXTBOOK CONTEXT:
+{current_context_text}
+
+### EXAMPLE JSON (Pattern to follow):
 [
   {{
-    "id": 1,
-    "front": "What is the powerhouse of the cell?",
-    "back": "Mitochondria",
-    "hint": "Cell organelle",
+    "id": 1, 
+    "front": "What is the largest planet in the solar system?", 
+    "back": "Jupiter", 
+    "hint": "Gas giant", 
     "importance": "high"
+  }},
+  {{
+    "id": 2, 
+    "front": "Which planet is known as the Red Planet?", 
+    "back": "Mars", 
+    "hint": "Fourth planet", 
+    "importance": "medium"
   }}
 ]
 
-### TEXTBOOK CONTEXT:
-{context[:6000]}
+### FLASHCARDS OUTPUT (Generate {needed} cards about the TEXTBOOK CONTEXT):"""
 
-### FLASHCARDS OUTPUT:"""
-
-                # Call AI for this batch
-                response_text = self.call_llama_optimized(prompt, num_predict=1500, temperature=0.1)
+            # Call AI for this batch - Use Qwen with standard temp
+            # Higher temp (0.2) to avoid repetitive loops, but low enough for JSON stability
+            response_text = self.call_llama_optimized(prompt, num_predict=1500, temperature=0.2)
+            
+            # Parse JSON with robustness for this batch
+            try:
+                # 1. Basic cleaning
+                clean_text = response_text.strip()
+                if "```json" in clean_text:
+                    clean_text = clean_text.split("```json")[-1].split("```")[0]
+                elif "```" in clean_text:
+                    clean_text = clean_text.split("```")[-1].split("```")[0]
                 
-                # Parse JSON with robustness for this batch
-                try:
-                    # 1. Basic cleaning
-                    clean_text = response_text.strip()
-                    if "```json" in clean_text:
-                        clean_text = clean_text.split("```json")[-1].split("```")[0]
-                    elif "```" in clean_text:
-                        clean_text = clean_text.split("```")[-1].split("```")[0]
+                start_idx = clean_text.find('[')
+                end_idx = clean_text.rfind(']')
+                
+                if start_idx != -1 and end_idx != -1:
+                    json_blob = clean_text[start_idx:end_idx+1]
                     
-                    start_idx = clean_text.find('[')
-                    end_idx = clean_text.rfind(']')
+                    # 2. JSON Repair Logic
+                    import re
+                    # Remove trailing commas
+                    json_blob = re.sub(r',\s*([\]}])', r'\1', json_blob)
+                    # Add missing commas between objects
+                    json_blob = re.sub(r'}\s*{', '}, {', json_blob)
                     
-                    if start_idx != -1 and end_idx != -1:
-                        json_blob = clean_text[start_idx:end_idx+1]
-                        
-                        # 2. JSON Repair Logic (handle common LLM mistakes)
-                        import re
-                        # Remove trailing commas
-                        json_blob = re.sub(r',\s*([\]}])', r'\1', json_blob)
-                        # Add missing commas between objects: } { -> }, {
-                        json_blob = re.sub(r'}\s*{', '}, {', json_blob)
-                        # Add missing commas between key-value pairs or values: "v" "k" -> "v", "k"
-                        json_blob = re.sub(r'"\s+"', '", "', json_blob)
-                        
-                        import json
-                        batch_cards = json.loads(json_blob)
-                        
-                        # 3. Validation & Integration
-                        pass_success = False
-                        for card in batch_cards:
-                            if isinstance(card, dict) and 'front' in card and 'back' in card:
-                                card['id'] = len(all_flashcards) + 1
-                                all_flashcards.append(card)
-                                pass_success = True
-                        
-                        if pass_success:
-                            break # Success! Exit retry loop
-                    else:
-                        print(f"⚠️ Attempt {retry_idx+1}: No JSON array found.")
-                except Exception as e:
-                    print(f"❌ Attempt {retry_idx+1}: JSON Parse failed: {e}")
-                    if retry_idx == max_pass_retries - 1:
-                        print(f"🔻 Giving up on Pass {pass_idx+1} after {max_pass_retries} attempts.")
+                    import json
+                    batch_cards = json.loads(json_blob)
+                    
+                    cards_added_in_pass = 0
+                    
+                    # Deduplication (Exact + Loose Substring)
+                    # We dropped the expensive Semantic Check because it was deleting too much
+                    seen_fronts = {re.sub(r'[^\w\s]', '', c['front'].lower().strip()) for c in all_flashcards}
+                    
+                    for card in batch_cards:
+                        if isinstance(card, dict) and 'front' in card and 'back' in card:
+                            f_norm = re.sub(r'[^\w\s]', '', card['front'].lower().strip())
+                            
+                            # Check 1: Exact Front Match
+                            if f_norm in seen_fronts:
+                                print(f"⚠️ Redundant Flashcard skipped: {card['front'][:30]}...")
+                                continue
+                            
+                            # Check 2: Check if question is suspiciously short/similar to existing
+                            is_suspicious = False
+                            for existing in all_flashcards:
+                                if card['front'].lower() in existing['front'].lower() or existing['front'].lower() in card['front'].lower():
+                                     # Only skip if length difference is small (implies slightly modified duplicate)
+                                     if abs(len(card['front']) - len(existing['front'])) < 10:
+                                         print(f"⚠️ Redundant Substring skipped: {card['front'][:30]}...")
+                                         is_suspicious = True
+                                         break
+                            
+                            if is_suspicious:
+                                continue
+                                
+                            card['id'] = len(all_flashcards) + 1
+                            all_flashcards.append(card)
+                            seen_fronts.add(f_norm)
+                            cards_added_in_pass += 1
+                            
+                            if len(all_flashcards) >= card_count:
+                                break
+                    
+                    print(f"✅ Pass {pass_idx+1}: Added {cards_added_in_pass} new cards.")
+                    
+                else:
+                    print(f"⚠️ Pass {pass_idx+1}: No JSON array found.")
+                    
+            except Exception as e:
+                print(f"❌ JSON Parse failed in Pass {pass_idx+1}: {e}")
 
-        flash_duration = time.time() - flash_start
-        print(f"⏱️ Total Flashcards generation completed in {flash_duration:.2f}s")
         print(f"✅ Generated {len(all_flashcards)} valid cards")
 
         if not all_flashcards:
@@ -1262,8 +1369,9 @@ Base them ONLY on the TEXTBOOK CONTEXT below.
                         pass_success = False
                         new_batch = []
                         # Pre-calculate normalized forms of existing questions for efficiency
-                        seen_norms = {re.sub(r'[^\w\s]', '', prev['question'].lower().strip()) for prev in all_questions}
-
+                        seen_q_norms = {re.sub(r'[^\w\s]', '', prev['question'].lower().strip()) for prev in all_questions}
+                        seen_a_norms = {prev['sample_answer'].lower().strip()[:40] for prev in all_questions}
+                        
                         for q in batch_qs:
                             if isinstance(q, dict) and 'question' in q and 'sample_answer' in q:
                                 # Normalization for duplicate detection
@@ -1271,8 +1379,6 @@ Base them ONLY on the TEXTBOOK CONTEXT below.
                                 a_norm = q['sample_answer'].lower().strip()[:40] # Check first 40 chars of answer
                                 
                                 # Check against already saved questions AND currently adding ones
-                                seen_q_norms = {re.sub(r'[^\w\s]', '', prev['question'].lower().strip()) for prev in all_questions}
-                                seen_a_norms = {prev['sample_answer'].lower().strip()[:40] for prev in all_questions}
                                 pending_q_norms = {re.sub(r'[^\w\s]', '', p['question'].lower().strip()) for p in new_batch}
                                 pending_a_norms = {p['sample_answer'].lower().strip()[:40] for p in new_batch}
                                 

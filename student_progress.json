@@ -621,5 +621,757 @@
         },
         "attempt_id": "678eeeb5-74cc-4a95-aa39-6dfa395a5a3b",
         "timestamp": "2026-01-07T23:46:12.679538"
+    },
+    {
+        "type": "quiz",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 2,
+        "total_questions": 5,
+        "questions": [
+            {
+                "id": 1,
+                "question": "What are oceans and continents?",
+                "options": [
+                    "A) Islands, seas, and landmasses",
+                    "B) Landmasses, seas, and islands",
+                    "C) Seas, landmasses, and oceans",
+                    "D) Oceans, landmasses, and seas"
+                ],
+                "correct_index": 2,
+                "explanation": "Oceans are vast bodies of saltwater covering most of the Earth's surface. Continents are large landmasses that make up the outer part of the Earth.",
+                "user_answer": 2
+            },
+            {
+                "id": 2,
+                "question": "What do you know about the circular lines in each map?",
+                "options": [
+                    "A) They are called meridians",
+                    "B) They are called parallels",
+                    "C) They are called latitudes",
+                    "D) They are called longitudes"
+                ],
+                "correct_index": 0,
+                "explanation": "Meridians and parallels are the major divisions of Earth's surface, with meridians being lines running from north to south (longitude), and parallels being circles around the Earth at different latitudes.",
+                "user_answer": 2
+            },
+            {
+                "id": 3,
+                "question": "Which hemisphere holds more water?",
+                "options": [
+                    "A) Northern Hemisphere",
+                    "B) Southern Hemisphere",
+                    "C) Both Hemispheres equally",
+                    "D) Neither Hemisphere"
+                ],
+                "correct_index": 1,
+                "explanation": "The Northern Hemisphere has a larger proportion of land compared to the Southern Hemisphere, which results in it having more oceans and seas.",
+                "user_answer": 0
+            },
+            {
+                "id": 4,
+                "question": "What do you think could be the approximate proportion of water to land in the Northern Hemisphere?",
+                "options": [
+                    "A) 70%",
+                    "B) 50%",
+                    "C) 30%",
+                    "D) 20%"
+                ],
+                "correct_index": 1,
+                "explanation": "The Northern Hemisphere has a larger ocean coverage, which means it is more likely to have a higher proportion of water compared to land.",
+                "user_answer": 0
+            },
+            {
+                "id": 5,
+                "question": "Are all the oceans connected with one another or are there separations between them?",
+                "options": [
+                    "A) All oceans are connected",
+                    "B) There are no connections between oceans",
+                    "C) Oceans are partially connected but not fully",
+                    "D) Some oceans are completely separated"
+                ],
+                "correct_index": 0,
+                "explanation": "The Earth's oceans are interconnected through various waterways and currents, forming a vast system.",
+                "user_answer": 0
+            }
+        ],
+        "metadata": null,
+        "attempt_id": "3f6ed776-e4b3-4b8a-8116-8802971435e6",
+        "timestamp": "2026-01-16T18:42:26.011682"
+    },
+    {
+        "type": "truefalse",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 3,
+        "total_questions": 5,
+        "questions": [
+            {
+                "statement": "Abundantly produced by the oceans",
+                "answer": true,
+                "explanation": "The text mentions that oceans support marine life and play a critical role in climate, indicating they are abundant.",
+                "corrected_statement": "",
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "A large expanse of landmass",
+                "answer": false,
+                "explanation": "The text describes the continents as 'landmasses' but not as 'landmasses surrounded by oceans'.",
+                "corrected_statement": "A large continent",
+                "user_answer": true,
+                "correct_answer": false
+            },
+            {
+                "statement": "A major source of pollution of the oceans",
+                "answer": true,
+                "explanation": "The text states that oceans are now seriously affected by human activity, indicating they can be sources of pollution.",
+                "corrected_statement": "",
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "The coldest continent",
+                "answer": false,
+                "explanation": "The text mentions continents but does not specify which one is the coldest. It also states that India is a part of a larger continent, suggesting it might be Antarctica.",
+                "corrected_statement": "",
+                "user_answer": true,
+                "correct_answer": false
+            },
+            {
+                "statement": "A landmass surrounded by the sea or ocean",
+                "answer": true,
+                "explanation": "The text explains that islands are landmasses but not continents. It also mentions that India is a part of a continent, which implies it is surrounded by oceans.",
+                "corrected_statement": "",
+                "user_answer": true,
+                "correct_answer": true
+            }
+        ],
+        "metadata": null,
+        "attempt_id": "dc6d1710-8691-4c4b-adeb-a0c6159b5737",
+        "timestamp": "2026-01-16T18:54:40.480323"
+    },
+    {
+        "type": "truefalse",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 4,
+        "total_questions": 5,
+        "questions": [
+            {
+                "statement": "Oceans cover more than two-thirds of the Earth's surface.",
+                "answer": true,
+                "explanation": "Majority water coverage",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "The Arctic Ocean is larger in area than all other oceans combined.",
+                "answer": false,
+                "explanation": "Smaller compared to others",
+                "corrected_statement": "The Pacific and Atlantic Oceans together are larger.",
+                "user_answer": false,
+                "correct_answer": false
+            },
+            {
+                "statement": "India is the largest country by land area in Asia.",
+                "answer": false,
+                "explanation": "Russia holds that title",
+                "corrected_statement": "The second-largest continent after Africa",
+                "user_answer": true,
+                "correct_answer": false
+            },
+            {
+                "statement": "Antarctica has no permanent human residents due to its extreme climate.",
+                "answer": true,
+                "explanation": "Inhabitable conditions present",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "The Mediterranean Sea is connected directly with the Atlantic Ocean through a natural waterway called the Strait of Gibraltar.",
+                "answer": true,
+                "explanation": "Sea connects to ocean",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            }
+        ],
+        "metadata": null,
+        "attempt_id": "c4de0efa-a0ae-4bfa-b4f9-4542038df473",
+        "timestamp": "2026-01-16T19:21:50.320794"
+    },
+    {
+        "type": "truefalse",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 4,
+        "total_questions": 5,
+        "questions": [
+            {
+                "statement": "Oceans cover more than two-thirds of the Earth's surface.",
+                "answer": true,
+                "explanation": "Majority water coverage",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "The Arctic Ocean is larger in area than all other oceans combined.",
+                "answer": false,
+                "explanation": "Smaller compared to others",
+                "corrected_statement": "The Pacific and Atlantic Oceans together are larger.",
+                "user_answer": false,
+                "correct_answer": false
+            },
+            {
+                "statement": "India is the largest country by land area in Asia.",
+                "answer": false,
+                "explanation": "Russia holds that title",
+                "corrected_statement": "The second-largest continent after Africa",
+                "user_answer": true,
+                "correct_answer": false
+            },
+            {
+                "statement": "Antarctica has no permanent human residents due to its extreme climate.",
+                "answer": true,
+                "explanation": "Inhabitable conditions present",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            },
+            {
+                "statement": "The Mediterranean Sea is connected directly with the Atlantic Ocean through a natural waterway called the Strait of Gibraltar.",
+                "answer": true,
+                "explanation": "Sea connects to ocean",
+                "corrected_statement": null,
+                "user_answer": true,
+                "correct_answer": true
+            }
+        ],
+        "metadata": null,
+        "attempt_id": "3728982c-0787-494b-9553-33a5159fa0f2",
+        "timestamp": "2026-01-16T19:21:54.265812"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 100,
+        "total_questions": 10,
+        "questions": null,
+        "metadata": {
+            "review_count": 0,
+            "known_count": 10,
+            "duration_seconds": 42,
+            "flashcards": [
+                {
+                    "id": 1,
+                    "front": "What is the powerhouse of the cell?",
+                    "back": "Mitochondria",
+                    "hint": "Cell organelle",
+                    "importance": "high"
+                },
+                {
+                    "id": 2,
+                    "front": "How many continents are there in practice?",
+                    "back": "Seven continents",
+                    "hint": "Most widely adopted and used list",
+                    "importance": "high"
+                },
+                {
+                    "id": 3,
+                    "front": "What do the Olympic rings symbolise?",
+                    "back": "Gathering of sportspeople from all over the world",
+                    "hint": "Symbols of the Olympic Games",
+                    "importance": "medium"
+                },
+                {
+                    "id": 4,
+                    "front": "Which continents are generally considered as two continents, but sometimes as one?",
+                    "back": "Africa and Eurasia",
+                    "hint": "Geologists often regard them as a single continent called ‘Eurasia’",
+                    "importance": "high"
+                },
+                {
+                    "id": 5,
+                    "front": "What is the most common count of continents in alphabetical order?",
+                    "back": "Four continents Africa-Eurasia, America, Antarctica, Australia",
+                    "hint": "The most common count is seven",
+                    "importance": "high"
+                },
+                {
+                    "id": 6,
+                    "front": "What is the powerhouse of the cell?",
+                    "back": "Mitochondria",
+                    "hint": "Cell organelle",
+                    "importance": "high"
+                },
+                {
+                    "id": 7,
+                    "front": "How many continents are there?",
+                    "back": "Five continents: Africa, Antarctica, Australia, Europe, North America, South America.",
+                    "hint": "The most common count is seven continents: Africa, Antarctica, Asia, Australia, Europe, North America, South America.",
+                    "importance": "high"
+                },
+                {
+                    "id": 8,
+                    "front": "What do the Olympic rings symbolize?",
+                    "back": "The Olympic rings symbolize the gathering of sportspeople from all over the world. They were introduced in 1920 and have been used since then.",
+                    "hint": "They represent unity, friendship, excellence, respect, and progress.",
+                    "importance": "high"
+                },
+                {
+                    "id": 9,
+                    "front": "Which continents are generally regarded as two continents?",
+                    "back": "Africa and Eurasia are generally regarded as two continents.",
+                    "hint": "Geologists often consider them as a single continent called 'Eurasia'.",
+                    "importance": "high"
+                },
+                {
+                    "id": 10,
+                    "front": "What is the most common count of continents?",
+                    "back": "Seven continents: Africa, Antarctica, Asia, Australia, Europe, North America, South America.",
+                    "hint": "The last list of seven continents is the one most widely adopted and used.",
+                    "importance": "high"
+                }
+            ],
+            "knownIndices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
+        "attempt_id": "3989ff73-6d1d-48b9-9dd3-ddb80f3df9ac",
+        "timestamp": "2026-01-16T19:28:05.882641"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 60,
+        "total_questions": 6,
+        "questions": null,
+        "metadata": {
+            "review_count": 0,
+            "known_count": 6,
+            "duration_seconds": 22,
+            "flashcards": [
+                {
+                    "id": 1,
+                    "front": "What are oceans?",
+                    "back": "Water bodies",
+                    "hint": "Covering seven-tenths of the Earth's surface",
+                    "importance": "high"
+                },
+                {
+                    "id": 2,
+                    "front": "What are continents?",
+                    "back": "Landmasses",
+                    "hint": "Visible on maps of oceans",
+                    "importance": "high"
+                },
+                {
+                    "id": 3,
+                    "front": "How many continents can you count?",
+                    "back": "Seven (most commonly used)",
+                    "hint": "Counting varies based on choice",
+                    "importance": "medium"
+                },
+                {
+                    "id": 4,
+                    "front": "What is the Northern Hemisphere compared to the Southern Hemisphere in terms of land area?",
+                    "back": "The Northern Hemisphere has more land than the Southern Hemisphere",
+                    "hint": "Northern Hemisphere: More land, Southern Hemisphere: Less land",
+                    "importance": "low"
+                },
+                {
+                    "id": 5,
+                    "front": "What are some names of oceans mentioned in the text?",
+                    "back": "Pacific Ocean, Atlantic Ocean, Indian Ocean, Arctic Ocean, Southern (Antarctic) Ocean",
+                    "hint": "Listed on page 32 of the chapter",
+                    "importance": "low"
+                },
+                {
+                    "id": 6,
+                    "front": "Are all oceans connected or separated?",
+                    "back": "Most of the world's oceans are interconnected, but there are some separations between them.",
+                    "hint": "Interconnected vs. Separated",
+                    "importance": "low"
+                }
+            ],
+            "knownIndices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+            ]
+        },
+        "attempt_id": "f653a43d-1a2c-44c3-8093-199cae19d474",
+        "timestamp": "2026-01-16T21:09:29.335095"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 60,
+        "total_questions": 6,
+        "questions": null,
+        "metadata": {
+            "review_count": 0,
+            "known_count": 6,
+            "duration_seconds": 26,
+            "flashcards": [
+                {
+                    "id": 1,
+                    "front": "What are oceans?",
+                    "back": "Water bodies",
+                    "hint": "Covering seven-tenths of the Earth's surface",
+                    "importance": "high"
+                },
+                {
+                    "id": 2,
+                    "front": "What are continents?",
+                    "back": "Landmasses",
+                    "hint": "Visible on maps of oceans",
+                    "importance": "high"
+                },
+                {
+                    "id": 3,
+                    "front": "How many continents can you count?",
+                    "back": "Seven (most commonly used)",
+                    "hint": "Counting varies based on choice",
+                    "importance": "medium"
+                },
+                {
+                    "id": 4,
+                    "front": "What is the Northern Hemisphere compared to the Southern Hemisphere in terms of land area?",
+                    "back": "The Northern Hemisphere has more land than the Southern Hemisphere",
+                    "hint": "Northern Hemisphere: More land, Southern Hemisphere: Less land",
+                    "importance": "low"
+                },
+                {
+                    "id": 5,
+                    "front": "What are some names of oceans mentioned in the text?",
+                    "back": "Pacific Ocean, Atlantic Ocean, Indian Ocean, Arctic Ocean, Southern (Antarctic) Ocean",
+                    "hint": "Listed on page 32 of the chapter",
+                    "importance": "low"
+                },
+                {
+                    "id": 6,
+                    "front": "Are all oceans connected or separated?",
+                    "back": "Most of the world's oceans are interconnected, but there are some separations between them.",
+                    "hint": "Interconnected vs. Separated",
+                    "importance": "low"
+                }
+            ],
+            "knownIndices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+            ]
+        },
+        "attempt_id": "9cd10ffd-49db-4ff1-81c8-c9b988d885dd",
+        "timestamp": "2026-01-16T21:10:02.140245"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 70,
+        "total_questions": 7,
+        "questions": null,
+        "metadata": {
+            "review_count": 0,
+            "known_count": 7,
+            "duration_seconds": 14,
+            "flashcards": [
+                {
+                    "id": 1,
+                    "front": "What are oceans?",
+                    "back": "Large bodies of saltwater covering most of Earth’s surface.",
+                    "hint": "Water",
+                    "importance": "high"
+                },
+                {
+                    "id": 2,
+                    "front": "What are continents?",
+                    "back": "Large landmasses on Earth's surface, visible in maps and atlases.",
+                    "hint": "Landmass",
+                    "importance": "high"
+                },
+                {
+                    "id": 3,
+                    "front": "How many continents can you count?",
+                    "back": "The exact number depends on the method of counting; it ranges from four to seven.",
+                    "hint": "Counting Method",
+                    "importance": "medium"
+                },
+                {
+                    "id": 4,
+                    "front": "What is the Northern Hemisphere compared to the Southern Hemisphere?",
+                    "back": "The Northern Hemisphere has more land than the Southern Hemisphere.",
+                    "hint": "Land Distribution",
+                    "importance": "low"
+                },
+                {
+                    "id": 5,
+                    "front": "Which continents are generally considered as two, but sometimes as one?",
+                    "back": "Africa and Eurasia (formerly known as Europe) are often regarded as a single continent.",
+                    "hint": "Continents",
+                    "importance": "low"
+                },
+                {
+                    "id": 6,
+                    "front": "What do you think could be the approximate proportion of water to land in the Northern Hemisphere?",
+                    "back": "Discuss with groups, but typically about 70% water and 30% land.",
+                    "hint": "Northern Hemisphere has more oceans",
+                    "importance": "low"
+                },
+                {
+                    "id": 7,
+                    "front": "Are all oceans connected with one another?",
+                    "back": "The oceans are interconnected but there are also separations between them, such as the Arctic Ocean and the Southern (Antarctic) Ocean.",
+                    "hint": "Ocean connections",
+                    "importance": "medium"
+                }
+            ],
+            "knownIndices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+            ]
+        },
+        "attempt_id": "6eedef1b-0e55-4c3c-8ecf-805f5cd58633",
+        "timestamp": "2026-01-16T21:29:50.233742"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 70,
+        "total_questions": 8,
+        "questions": null,
+        "metadata": {
+            "review_count": 1,
+            "known_count": 7,
+            "duration_seconds": 70,
+            "flashcards": [
+                {
+                    "id": 1,
+                    "front": "What are oceans and continents?",
+                    "back": "Oceans cover vast areas of Earth, while continents are large landmasses. They impact life on Earth, including human life.",
+                    "hint": "Key concepts",
+                    "importance": "high"
+                },
+                {
+                    "id": 2,
+                    "front": "What are their names and distribution?",
+                    "back": "Oceans and continents have various names based on location. They can be counted in different ways, with the most common count being seven.",
+                    "hint": "Key concepts",
+                    "importance": "high"
+                },
+                {
+                    "id": 3,
+                    "front": "What are their impacts?",
+                    "back": "Oceans and continents impact life on Earth, including human life. They support marine life and play a critical role in the world climate.",
+                    "hint": "Key concepts",
+                    "importance": "high"
+                },
+                {
+                    "id": 4,
+                    "front": "What are their distribution?",
+                    "back": "Oceans and continents are not distributed equally between the Northern and Southern Hemispheres. The Northern Hemisphere has more land than the Southern Hemisphere.",
+                    "hint": "Key concepts",
+                    "importance": "high"
+                },
+                {
+                    "id": 5,
+                    "front": "What do you think could be the approximate proportion of water to land in the Northern and Southern Hemispheres?",
+                    "back": "Discuss in groups. The Northern Hemisphere has more water than land, while the Southern Hemisphere has more land than water.",
+                    "hint": "Key concepts",
+                    "importance": "high"
+                },
+                {
+                    "id": 6,
+                    "front": "What are the names and distribution of oceans?",
+                    "back": "Oceans have various names such as sea, bay, gulf, etc., with the blue areas on maps consisting primarily of oceans.",
+                    "hint": "Key definitions",
+                    "importance": "high"
+                },
+                {
+                    "id": 7,
+                    "front": "How do oceans and continents distribute?",
+                    "back": "Oceans are not distributed equally between the Northern and Southern Hemispheres. The distribution of water and land on Earth is uneven.",
+                    "hint": "Key facts",
+                    "importance": "medium"
+                },
+                {
+                    "id": 8,
+                    "front": "What do you think could be the approximate proportion of water to land in the Northern Hemisphere?",
+                    "back": "Discuss with groups and provide an estimate based on what you know about Earth's surface distribution.",
+                    "hint": "Key facts",
+                    "importance": "low"
+                }
+            ],
+            "knownIndices": [
+                0,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        "attempt_id": "6c03dc4b-ab93-4552-a7b7-2a1e306ddc2d",
+        "timestamp": "2026-01-16T22:13:07.057551"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 100,
+        "total_questions": 10,
+        "questions": null,
+        "metadata": {
+            "review_count": 0,
+            "known_count": 10,
+            "duration_seconds": 18,
+            "flashcards": [
+                {
+                    "id": 1,
+                    "front": "What is the largest continent in the world?",
+                    "back": "Asia",
+                    "hint": "Most populous and diverse region",
+                    "importance": "high"
+                },
+                {
+                    "id": 2,
+                    "front": "Which ocean borders both Asia and Australia?",
+                    "back": "Indian Ocean",
+                    "hint": "West of Australia, east of Asia",
+                    "importance": "medium"
+                },
+                {
+                    "id": 3,
+                    "front": "What is the smallest continent in terms of area?",
+                    "back": "Antarctica",
+                    "hint": "Tallest and coldest continent",
+                    "importance": "high"
+                },
+                {
+                    "id": 4,
+                    "front": "Which ocean has a significant influence on climate patterns?",
+                    "back": "Atlantic Ocean",
+                    "hint": "Winds, currents, and weather systems",
+                    "importance": "medium"
+                },
+                {
+                    "id": 5,
+                    "front": "What is the deepest part of the ocean?",
+                    "back": "Marianas Trench",
+                    "hint": "Over 10,000 meters deep",
+                    "importance": "high"
+                },
+                {
+                    "id": 6,
+                    "front": "How many continents are commonly counted as seven?",
+                    "back": "Seven continents: Africa, Antarctica, Asia, Australia, Europe, North America, South America",
+                    "hint": "This is the most widely adopted list.",
+                    "importance": "high"
+                },
+                {
+                    "id": 7,
+                    "front": "What are some of the dangers that oceans pose to life?",
+                    "back": "Pollution from plastic waste choking marine life and overfishing leading to a decline in marine biodiversity",
+                    "hint": "These include pollution and overexploitation.",
+                    "importance": "medium"
+                },
+                {
+                    "id": 8,
+                    "front": "What is the primary function of oceans?",
+                    "back": "Regulating climate and sustaining life on Earth through photosynthesis by marine flora",
+                    "hint": "Oceans play a crucial role in regulating the planet's temperature.",
+                    "importance": "high"
+                },
+                {
+                    "id": 9,
+                    "front": "How do oceans contribute to human activities?",
+                    "back": "Migration for trade and military purposes, cultural significance of coastal regions",
+                    "hint": "Oceans have been used historically for various forms of transportation and culture.",
+                    "importance": "medium"
+                },
+                {
+                    "front": "What are oceans and continents?",
+                    "back": "Oceans cover seven-tenths of the terrestrial globe, providing a vast reservoir of life. Continents include Africa, Antarctica, Australia, Europe, North America, and South America.",
+                    "hint": "Names: Pacific Ocean, Atlantic Ocean, Indian Ocean, Arctic Ocean, Southern Ocean",
+                    "importance": "high",
+                    "id": 10
+                }
+            ],
+            "knownIndices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
+        "attempt_id": "d5235a27-0111-4890-a029-535cc7078dd5",
+        "timestamp": "2026-01-16T23:15:45.417488"
     }
 ]
