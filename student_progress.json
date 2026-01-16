@@ -401,9 +401,9 @@
         "subject": "Social",
         "book_id": "bdb1fde8-f1ea-4eff-9f12-ed2d4a2aaabc",
         "book_name": "Locating Places on the Earth",
-        "score": 0,
+        "score": 4,
         "total_questions": 1,
-        "status": "AI_REVIEWED",
+        "status": "REVIEWED",
         "metadata": {
             "mode": "practice",
             "questions": [
@@ -419,7 +419,9 @@
                         "feedback": "No clear response detected in the audio.",
                         "confidence": "high",
                         "keywords_detected": []
-                    }
+                    },
+                    "score": 4,
+                    "feedback": "No clear response detected in the audio."
                 }
             ],
             "start_time": "Wed 01/07/2026",
@@ -1373,5 +1375,236 @@
         },
         "attempt_id": "d5235a27-0111-4890-a029-535cc7078dd5",
         "timestamp": "2026-01-16T23:15:45.417488"
+    },
+    {
+        "type": "flashcards",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 100,
+        "total_questions": 10,
+        "questions": null,
+        "metadata": {
+            "review_count": 0,
+            "known_count": 10,
+            "duration_seconds": 43,
+            "flashcards": [
+                {
+                    "id": 1,
+                    "front": "What is the largest continent in the world?",
+                    "back": "Asia",
+                    "hint": "Most populous and diverse region",
+                    "importance": "high"
+                },
+                {
+                    "id": 2,
+                    "front": "Which ocean borders both Asia and Australia?",
+                    "back": "Indian Ocean",
+                    "hint": "West of Australia, east of Asia",
+                    "importance": "medium"
+                },
+                {
+                    "id": 3,
+                    "front": "What is the smallest continent in terms of area?",
+                    "back": "Antarctica",
+                    "hint": "Tallest and coldest continent",
+                    "importance": "high"
+                },
+                {
+                    "id": 4,
+                    "front": "Which ocean has a significant influence on climate patterns?",
+                    "back": "Atlantic Ocean",
+                    "hint": "Winds, currents, and weather systems",
+                    "importance": "medium"
+                },
+                {
+                    "id": 5,
+                    "front": "What is the deepest part of the ocean?",
+                    "back": "Marianas Trench",
+                    "hint": "Over 10,000 meters deep",
+                    "importance": "high"
+                },
+                {
+                    "id": 6,
+                    "front": "How many continents are commonly counted as seven?",
+                    "back": "Seven continents: Africa, Antarctica, Asia, Australia, Europe, North America, South America",
+                    "hint": "This is the most widely adopted list.",
+                    "importance": "high"
+                },
+                {
+                    "id": 7,
+                    "front": "What are some of the dangers that oceans pose to life?",
+                    "back": "Pollution from plastic waste choking marine life and overfishing leading to a decline in marine biodiversity",
+                    "hint": "These include pollution and overexploitation.",
+                    "importance": "medium"
+                },
+                {
+                    "id": 8,
+                    "front": "What is the primary function of oceans?",
+                    "back": "Regulating climate and sustaining life on Earth through photosynthesis by marine flora",
+                    "hint": "Oceans play a crucial role in regulating the planet's temperature.",
+                    "importance": "high"
+                },
+                {
+                    "id": 9,
+                    "front": "How do oceans contribute to human activities?",
+                    "back": "Migration for trade and military purposes, cultural significance of coastal regions",
+                    "hint": "Oceans have been used historically for various forms of transportation and culture.",
+                    "importance": "medium"
+                },
+                {
+                    "front": "What are oceans and continents?",
+                    "back": "Oceans cover seven-tenths of the terrestrial globe, providing a vast reservoir of life. Continents include Africa, Antarctica, Australia, Europe, North America, and South America.",
+                    "hint": "Names: Pacific Ocean, Atlantic Ocean, Indian Ocean, Arctic Ocean, Southern Ocean",
+                    "importance": "high",
+                    "id": 10
+                }
+            ],
+            "knownIndices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
+        "attempt_id": "b9af5446-4a58-4f63-95f1-6fe62ef7a79c",
+        "timestamp": "2026-01-16T23:17:11.225285"
+    },
+    {
+        "type": "oral_test",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 0,
+        "total_questions": 3,
+        "status": "IN_PROGRESS",
+        "metadata": {
+            "mode": "practice",
+            "questions": [
+                {
+                    "question": "How do oceans and continents impact life on Earth, including human life?",
+                    "sample_answer": "Oceans provide a habitat for marine life, support global climate regulation through heat absorption and distribution, and influence weather patterns. Continents are crucial for biodiversity as they act as refuges for species during environmental changes. They also play a significant role in the carbon cycle by storing atmospheric CO2. Human activities such as pollution and overfishing can negatively impact both oceans and continents.",
+                    "type": "explanation",
+                    "id": 1,
+                    "audio_url": "/api/oral_audio/35af2aed-035c-49a5-b165-dd78b27ca1d4/q_0.webm"
+                },
+                {
+                    "question": "How do oceans and continents impact human life, including marine ecosystems?",
+                    "sample_answer": "Oceans provide habitats for a vast array of marine life, supporting diverse ecosystems that are crucial to the survival of many species. They also play a significant role in regulating Earth's climate through processes like carbon sequestration and upwelling. Continents influence human life by providing resources such as food, water, and land-based environments where humans can live and thrive.",
+                    "type": "explanation",
+                    "id": 2,
+                    "audio_url": "/api/oral_audio/35af2aed-035c-49a5-b165-dd78b27ca1d4/q_1.webm"
+                },
+                {
+                    "question": "How do oceans and continents impact life on Earth, including human life?",
+                    "sample_answer": "Oceans provide habitats for marine life, regulate global climate patterns, and support the food chain. Continents are crucial for human settlements, agriculture, and transportation infrastructure. They also play a significant role in cultural and historical contexts.",
+                    "type": "explanation",
+                    "id": 3
+                }
+            ],
+            "start_time": "Fri 01/16/2026"
+        },
+        "attempt_id": "35af2aed-035c-49a5-b165-dd78b27ca1d4",
+        "timestamp": "2026-01-16T23:24:01.455558"
+    },
+    {
+        "type": "oral_test",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 14,
+        "total_questions": 3,
+        "status": "REVIEWED",
+        "metadata": {
+            "mode": "practice",
+            "questions": [
+                {
+                    "question": "What are the names of the continents?",
+                    "sample_answer": "The names of the continents include Africa, Antarctica, Asia, Australia/Oceania, Europe, North America, and South America.",
+                    "rubric": "Correctly lists all seven continents.",
+                    "id": 1,
+                    "audio_url": "/api/oral_audio/603a933c-1aa4-4430-87b0-078a6732eb17/q_0.webm",
+                    "transcript": "There are seven continents and they are Asia, Africa, North America, South America, Antarctica, Europe and Austria.",
+                    "ai_analysis": {
+                        "score": 3,
+                        "feedback": "The student's response is mostly accurate and complete, but it lacks some essential keywords.",
+                        "confidence": "medium",
+                        "keywords_detected": [
+                            "continents",
+                            "Asia",
+                            "Africa",
+                            "North America",
+                            "South America",
+                            "Antarctica",
+                            "Europe"
+                        ]
+                    },
+                    "score": 5,
+                    "feedback": "The student's response is mostly accurate"
+                },
+                {
+                    "question": "How do oceans impact life on Earth, including human life?",
+                    "sample_answer": "Oceans support marine life, regulate climate, provide habitats for many species, and are crucial for global weather patterns. They also play a significant role in supporting human life through food sources like fish and seafood.",
+                    "rubric": "Addresses the impacts of oceans on both marine and terrestrial ecosystems.",
+                    "id": 2,
+                    "audio_url": "/api/oral_audio/603a933c-1aa4-4430-87b0-078a6732eb17/q_1.webm",
+                    "transcript": "Oceans regulate earth's climate and provide 50% of our oxygen while continents offer stable  habitats and resources like freshwater and minerals together they drive the water cycle,  support global biodiversity and facilitate human trade, agriculture and settlement, fundamentally  shaping how we live and survive.",
+                    "ai_analysis": {
+                        "score": 4,
+                        "feedback": "Your response is quite comprehensive and accurately captures many aspects related to oceans' impact on life, including human life. However, it could be more precise by using specific terminology.",
+                        "confidence": "medium",
+                        "keywords_detected": [
+                            "oceans",
+                            "climate regulation",
+                            "habitat",
+                            "global weather patterns",
+                            "human trade",
+                            "agriculture",
+                            "settlement"
+                        ]
+                    },
+                    "score": 5,
+                    "feedback": "Your response is quite comprehensive and accurately captures many aspects related to oceans' impact on life, including human life. "
+                },
+                {
+                    "question": "What do you think could be the approximate proportion of water to land in the Northern Hemisphere?",
+                    "sample_answer": "The Northern Hemisphere has approximately 70% land and 30% ocean.",
+                    "rubric": "Provides an estimate based on the given information.",
+                    "id": 3,
+                    "audio_url": "/api/oral_audio/603a933c-1aa4-4430-87b0-078a6732eb17/q_2.webm",
+                    "transcript": "In the northern hemisphere, the approximate proportion of water to land is 60% water to 40%  land.  While the entire earth is roughly 71% water, the northern hemisphere contains the majority  of world's land masses, making its ratio significantly more land heavy than the water  dominated southern hemisphere.",
+                    "ai_analysis": {
+                        "score": 4,
+                        "feedback": "Your response is quite accurate and complete. You have correctly identified that the Northern Hemisphere has approximately 70% land and 30% ocean, which aligns with the canonical answer.",
+                        "confidence": "high",
+                        "keywords_detected": [
+                            "Northern Hemisphere",
+                            "water to land ratio",
+                            "approximate proportion",
+                            "land masses",
+                            "world's land masses"
+                        ]
+                    },
+                    "score": 4,
+                    "feedback": "Your response is quite accurate and complete. You have correctly identified that the Northern Hemisphere has approximately 70% land and 30% ocean, which aligns with the canonical answer."
+                }
+            ],
+            "start_time": "Fri 01/16/2026",
+            "ai_reviewed": true
+        },
+        "attempt_id": "603a933c-1aa4-4430-87b0-078a6732eb17",
+        "timestamp": "2026-01-16T23:33:56.906425"
     }
 ]

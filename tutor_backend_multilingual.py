@@ -1220,15 +1220,28 @@ You are an expert educational content creator. Your task is to generate {needed 
                                 print(f"⚠️ Redundant Flashcard skipped: {card['front'][:30]}...")
                                 continue
                             
-                            # Check 2: Check if question is suspiciously short/similar to existing
+                            # Check 2: Keyword Similarity (Semantic Dedup)
+                            # Simple "Bag of Words" overlap to catch rephrasing
+                            # e.g. "What is largest planet?" vs "Which is the biggest planet?"
                             is_suspicious = False
+                            
+                            def get_keywords(text):
+                                # Simple tokenizer: lowercase, alpha only, ignore short words
+                                return {w for w in re.split(r'\W+', text.lower()) if len(w) > 3}
+                            
+                            new_kw = get_keywords(card['front'])
+                            
                             for existing in all_flashcards:
-                                if card['front'].lower() in existing['front'].lower() or existing['front'].lower() in card['front'].lower():
-                                     # Only skip if length difference is small (implies slightly modified duplicate)
-                                     if abs(len(card['front']) - len(existing['front'])) < 10:
-                                         print(f"⚠️ Redundant Substring skipped: {card['front'][:30]}...")
-                                         is_suspicious = True
-                                         break
+                                old_kw = get_keywords(existing['front'])
+                                # Jaccard-ish overlap
+                                if not new_kw or not old_kw: continue
+                                
+                                overlap = len(new_kw & old_kw)
+                                # If >75% of the new card's keywords are already in an old card, it's a dup
+                                if overlap / len(new_kw) > 0.75:
+                                    print(f"⚠️ Semantic Duplicate detected: '{card['front'][:30]}...' ~= '{existing['front'][:30]}...'")
+                                    is_suspicious = True
+                                    break
                             
                             if is_suspicious:
                                 continue
@@ -1320,6 +1333,15 @@ Base them ONLY on the TEXTBOOK CONTEXT below.
 
 ### TEXTBOOK CONTEXT:
 {context[:4000]}
+
+### EXAMPLE JSON (STRICT FORMAT):
+[
+  {{
+    "question": "Explain the process of photosynthesis.",
+    "sample_answer": "Plants convert sunlight into energy.",
+    "rubric": "Mentions sunlight, chlorophyll, and energy conversion."
+  }}
+]
 
 ### ORAL TEST QUESTIONS OUTPUT (JSON):"""
 

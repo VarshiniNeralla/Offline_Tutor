@@ -21,7 +21,8 @@ import {
     History,
     ChevronRight,
     Star,
-    CheckCircle2
+    CheckCircle2,
+    Zap
 } from "lucide-react";
 
 import "../assets/styles/admin-dashboard.css";
