@@ -66,8 +66,10 @@ class ChatRequest(BaseModel):
     language: str
     mode: Optional[str] = None
 
+from typing import List, Optional, Dict, Any, Union
+
 class ChatResponse(BaseModel):
-    response: str
+    response: Union[str, Dict, List]
     sources: List[str]
     audio_base64: Optional[str] = None # We will send audio as base64 if needed
 

@@ -15,6 +15,7 @@ import KeywordExplorerTool from './components/tools/KeywordExplorerTool';
 import TrueFalseTool from './components/tools/TrueFalseTool';
 import FlashcardsTool from './components/tools/FlashcardsTool';
 import OralTestTool from './components/tools/OralTestTool';
+import MindMapTool from './components/tools/MindMapTool';
 import MyProgress from './components/MyProgress';
 
 // Wrapper for AnimatePresence to work with Routes
@@ -34,6 +35,7 @@ const AnimatedRoutes = () => {
                 <Route path="/truefalse" element={<TrueFalseTool />} />
                 <Route path="/flashcards" element={<FlashcardsTool />} />
                 <Route path="/oraltest" element={<OralTestTool />} />
+                <Route path="/mindmap" element={<MindMapTool />} />
                 <Route path="/student/progress" element={<MyProgress />} />
                 <Route path="/teacher" element={<AdminDashboard />} />
             </Routes>

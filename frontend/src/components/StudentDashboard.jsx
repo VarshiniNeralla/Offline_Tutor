@@ -21,7 +21,8 @@ import {
     Scale,
     HelpCircle,
     ListChecks,
-    History
+    History,
+    Share2
 } from "lucide-react";
 
 import "../assets/styles/student-dashboard.css";
@@ -219,6 +220,8 @@ const StudentDashboard = () => {
                                     navigate("/flashcards", { state: toolState });
                                 } else if (toolType === 'oral') {
                                     navigate("/oraltest", { state: toolState });
+                                } else if (toolType === 'mindmap') {
+                                    navigate("/mindmap", { state: toolState });
                                 } else {
                                     navigate("/chat", {
                                         state: {
@@ -246,7 +249,7 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
         { id: 'truefalse', icon: CheckSquare, title: "True/False", desc: "Fact checking" },
         { id: 'flashcards', icon: FileText, title: "Flashcards", desc: "Key concepts" },
         { id: 'oral', icon: Mic, title: "Oral Test", desc: "Speak answers" },
-        { id: 'mindmap', icon: Users, title: "Mind Maps", desc: "Visualize connections" },
+        { id: 'mindmap', icon: Share2, title: "Mind Maps", desc: "Visualize connections" },
         { id: 'revision', icon: Layout, title: "One Page", desc: "Revision Sheet" },
         // { id: 'compare', icon: Scale, title: "Compare", desc: "Side by side" },
         // { id: 'doubt', icon: HelpCircle, title: "Doubt", desc: "Detector" },

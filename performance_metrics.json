@@ -173,5 +173,33 @@
     "tokens": 69,
     "time": 27.96,
     "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-01-17 00:11:38",
+    "mode": "mindmap",
+    "tokens": 378,
+    "time": 43.31,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-01-17 00:14:49",
+    "mode": "mindmap",
+    "tokens": 259,
+    "time": 18.27,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-01-17 00:15:40",
+    "mode": "mindmap",
+    "tokens": 453,
+    "time": 26.11,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-01-17 00:15:56",
+    "mode": "mindmap",
+    "tokens": 230,
+    "time": 42.77,
+    "model": "qwen2.5:1.5b"
   }
 ]

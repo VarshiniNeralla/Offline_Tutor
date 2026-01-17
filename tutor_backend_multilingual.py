@@ -36,6 +36,7 @@ class AITextbookTutorMultilingualBackendOffline:
         self.language = language
         self.textbooks = {}
         self.vectorstore = None
+        self.model_name = "qwen2.5:1.5b" # Default offline model
         self.setup_embeddings_offline()
         self.check_llama_offline()
         if self.language == 'telugu':
@@ -1485,6 +1486,123 @@ Cover a different fact than: {", ".join([q['question'][:30] for q in all_questio
 
         return all_questions, [], "oral_test"
 
+    def generate_mindmap_response(self, book_id: str, language: str = 'en'):
+        """Generates a hierarchical mind map structure for a book."""
+        print(f"🧠 Generating Mind Map for book_id: {book_id}...")
+        
+        # 1. Retrieve Context
+        filter_dict = {"book_id": book_id}
+        try:
+            # Fetch top 12 chunks for broad coverage (approx 5000 chars)
+            relevant_docs = self.vectorstore.similarity_search("Main concepts and structure of this chapter", k=12, filter=filter_dict)
+            context = "\n\n".join([doc.page_content for doc in relevant_docs])
+            
+            if not context or len(context.strip()) < 200:
+                print("⚠️ Insufficient context for Mind Map.")
+                return {"error": "Insufficient content found for this book."}, [], "error"
+        except Exception as e:
+            print(f"⚠️ Vector search failed for Mind Map: {e}")
+            return {"error": "Database error retrieving content."}, [], "error"
+
+        # 2. Robust Line-Based Prompting (No JSON)
+        # We ask for a simple text format that 1.5B models can handle perfectly.
+        prompt = f"""### SYSTEM:
+You are an expert curriculum designer. create a hierarchical mind map.
+Use the following EXACT format:
+ROOT: [Chapter Title]
+SUBTOPIC: [Main Branch Name]
+CONCEPT: [Key Concept]
+DETAIL: [Brief Detail]
+CONNECTION: [Related Concept Name]
+
+Rules:
+1. Indentation does not matter.
+2. Order matters (Concepts belong to the last Subtopic).
+3. Max 8 Subtopics, 5 Concepts each.
+
+### INPUT TEXT:
+{context[:6000]}
+
+### MIND MAP OUTPUT:
+ROOT:"""
+
+        # 3. Generation
+        print(f"🧠 Generating Mind Map (Line-Based Strategy)...")
+        # We pre-fill "ROOT:" to guide the model
+        response_text = "ROOT:" + self.call_llama_optimized(prompt, num_predict=2000, temperature=0.1, format=None)
+        
+        # 4. Robust Line-Based Parser
+        try:
+            lines = response_text.split('\n')
+            
+            # Data Structure
+            mind_map = {
+                "title": "Mind Map",
+                "subtopics": []
+            }
+            
+            current_subtopic = None
+            current_concept = None
+            
+            seen_ids = set()
+            
+            def generate_id(prefix):
+                 new_id = f"{prefix}_{len(seen_ids)}"
+                 seen_ids.add(new_id)
+                 return new_id
+
+            for line in lines:
+                line = line.strip()
+                if not line: continue
+                
+                # Parse Line Types
+                if line.startswith("ROOT:"):
+                    mind_map["title"] = line.replace("ROOT:", "").strip()
+                    
+                elif line.startswith("SUBTOPIC:"):
+                    name = line.replace("SUBTOPIC:", "").strip()
+                    if name:
+                        current_subtopic = {
+                            "id": generate_id("st"),
+                            "name": name,
+                            "concepts": []
+                        }
+                        mind_map["subtopics"].append(current_subtopic)
+                        current_concept = None # Reset concept context
+                        
+                elif line.startswith("CONCEPT:"):
+                    name = line.replace("CONCEPT:", "").strip()
+                    if name and current_subtopic:
+                        current_concept = {
+                            "id": generate_id("c"),
+                            "name": name,
+                            "details": [],
+                            "connections": []
+                        }
+                        current_subtopic["concepts"].append(current_concept)
+                        
+                elif line.startswith("DETAIL:"):
+                    text = line.replace("DETAIL:", "").strip()
+                    if text and current_concept:
+                        current_concept["details"].append(text)
+
+            # Validation
+            if not mind_map["subtopics"]:
+                 print("⚠️ Parser found no subtopics. Fallback to raw text.")
+                 # Create a dummy structure from raw text if parsing failed completely
+                 mind_map["subtopics"] = [{
+                     "id": "st_error",
+                     "name": "Key Concepts",
+                     "concepts": [{"id": "c_err", "name": "Content", "details": [response_text[:100] + "..."]}]
+                 }]
+
+            print(f"✅ Generated Mind Map '{mind_map.get('title')}' with {len(mind_map['subtopics'])} branches.")
+            return mind_map, [], "mindmap"
+
+        except Exception as e:
+            print(f"❌ Mind Map Parsing failed: {e}")
+            return {"error": "Parsing error."}, [], "error"
+
     def transcribe_file(self, audio_path):
         """Transcribe an audio file using the local Whisper model."""
         if not hasattr(self, 'whisper_model') or self.whisper_model is None:
@@ -1603,6 +1721,9 @@ You are an expert oral exam reviewer. Your task is to evaluate a student's spoke
             return self.generate_flashcards_response(question, selected_subjects, selected_books)
         if mode == "oral_test":
             return self.generate_oral_test_response(question, selected_subjects, selected_books)
+        if mode == "mindmap":
+            book_id = selected_books[0] if selected_books else "unknown"
+            return self.generate_mindmap_response(book_id, language=self.language)
 
         # STEP 1: Detect Intent (Brevity vs Elaboration)
         if not mode:
