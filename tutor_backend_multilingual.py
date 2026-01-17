@@ -1507,29 +1507,30 @@ Cover a different fact than: {", ".join([q['question'][:30] for q in all_questio
         # 2. Robust Line-Based Prompting (No JSON)
         # We ask for a simple text format that 1.5B models can handle perfectly.
         prompt = f"""### SYSTEM:
-You are an expert curriculum designer. create a hierarchical mind map.
+You are an expert curriculum designer. Create a hierarchical mind map.
 Use the following EXACT format:
 ROOT: [Chapter Title]
-SUBTOPIC: [Main Branch Name]
+SUBTOPIC: [Unique Main Branch Name]
 CONCEPT: [Key Concept]
 DETAIL: [Brief Detail]
 CONNECTION: [Related Concept Name]
 
 Rules:
-1. Indentation does not matter.
-2. Order matters (Concepts belong to the last Subtopic).
+1. NO DUPLICATES. Each Subtopic must be unique.
+2. Cover the ENTIRE chapter, not just one part.
 3. Max 8 Subtopics, 5 Concepts each.
+4. Use short, punchy names (1-4 words).
+5. START IMMEDIATELY with 'ROOT:'. Do not write any intro.
 
 ### INPUT TEXT:
 {context[:6000]}
 
-### MIND MAP OUTPUT:
-ROOT:"""
+### MIND MAP OUTPUT:"""
 
         # 3. Generation
         print(f"🧠 Generating Mind Map (Line-Based Strategy)...")
-        # We pre-fill "ROOT:" to guide the model
-        response_text = "ROOT:" + self.call_llama_optimized(prompt, num_predict=2000, temperature=0.1, format=None)
+        # Removed manual "ROOT:" prepend to let model drive, but we enforce it via prompt
+        response_text = self.call_llama_optimized(prompt, num_predict=2000, temperature=0.3, format=None)
         
         # 4. Robust Line-Based Parser
         try:
@@ -1545,6 +1546,7 @@ ROOT:"""
             current_concept = None
             
             seen_ids = set()
+            seen_subtopic_names = set()
             
             def generate_id(prefix):
                  new_id = f"{prefix}_{len(seen_ids)}"
@@ -1557,11 +1559,17 @@ ROOT:"""
                 
                 # Parse Line Types
                 if line.startswith("ROOT:"):
-                    mind_map["title"] = line.replace("ROOT:", "").strip()
+                    title = line.replace("ROOT:", "").strip()
+                    if title: mind_map["title"] = title
                     
                 elif line.startswith("SUBTOPIC:"):
                     name = line.replace("SUBTOPIC:", "").strip()
-                    if name:
+                    name_lower = name.lower()
+                    
+                    # DEDUPLICATION CHECK
+                    if name and name_lower not in seen_subtopic_names:
+                        seen_subtopic_names.add(name_lower)
+                        
                         current_subtopic = {
                             "id": generate_id("st"),
                             "name": name,
@@ -1569,22 +1577,31 @@ ROOT:"""
                         }
                         mind_map["subtopics"].append(current_subtopic)
                         current_concept = None # Reset concept context
+                    else:
+                        current_subtopic = None # Skip duplicates
                         
                 elif line.startswith("CONCEPT:"):
-                    name = line.replace("CONCEPT:", "").strip()
-                    if name and current_subtopic:
-                        current_concept = {
-                            "id": generate_id("c"),
-                            "name": name,
-                            "details": [],
-                            "connections": []
-                        }
-                        current_subtopic["concepts"].append(current_concept)
+                    if current_subtopic: # Only add if we are in a valid (non-duplicate) subtopic
+                        name = line.replace("CONCEPT:", "").strip()
+                        # Concept Dedup within subtopic (optional but good)
+                        existing_Concepts = [c['name'].lower() for c in current_subtopic['concepts']]
+                        
+                        if name and name.lower() not in existing_Concepts:
+                            current_concept = {
+                                "id": generate_id("c"),
+                                "name": name,
+                                "details": [],
+                                "connections": []
+                            }
+                            current_subtopic["concepts"].append(current_concept)
+                        else:
+                            current_concept = None
                         
                 elif line.startswith("DETAIL:"):
-                    text = line.replace("DETAIL:", "").strip()
-                    if text and current_concept:
-                        current_concept["details"].append(text)
+                    if current_concept:
+                        text = line.replace("DETAIL:", "").strip()
+                        if text and len(current_concept["details"]) < 3: # Limit details
+                            current_concept["details"].append(text)
 
             # Validation
             if not mind_map["subtopics"]:
