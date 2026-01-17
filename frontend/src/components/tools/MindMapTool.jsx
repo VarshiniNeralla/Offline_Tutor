@@ -94,6 +94,7 @@ const MindMapTool = () => {
 
     const handleRegenerate = () => {
         if (window.confirm("Regenerating will replace the existing mind map. This cannot be undone.")) {
+            localStorage.removeItem(`mindmap_pos_${bookId}`); // Clear saved positions
             setRegenerating(true);
             fetchMindMap(true);
         }
@@ -125,12 +126,17 @@ const MindMapTool = () => {
         });
     };
 
-    // --- Layout Calculation (Radial) ---
-    const layout = useMemo(() => {
-        if (!mindMapData) return { nodes: [], links: [] };
+    // --- Node State & Layout ---
+    const [nodes, setNodes] = useState([]);
+    const [links, setLinks] = useState([]);
+    const [draggingNodeId, setDraggingNodeId] = useState(null);
 
-        const nodes = [];
-        const links = [];
+    // Initial Layout Calculation
+    useEffect(() => {
+        if (!mindMapData) return;
+
+        const newNodes = [];
+        const newLinks = [];
 
         // Settings
         const CENTER_X = 400;
@@ -138,7 +144,7 @@ const MindMapTool = () => {
         const SUBTOPIC_RADIUS = 250;
 
         // 1. Center Node
-        nodes.push({
+        newNodes.push({
             id: "center",
             type: "center",
             label: mindMapData.title,
@@ -156,7 +162,7 @@ const MindMapTool = () => {
             const color = getSubtopicColor(stIdx);
 
             // Subtopic Node
-            nodes.push({
+            newNodes.push({
                 id: st.id,
                 type: "subtopic",
                 label: st.name,
@@ -167,21 +173,20 @@ const MindMapTool = () => {
             });
 
             // Link to Center
-            links.push({ source: "center", target: st.id, color: color });
+            newLinks.push({ source: "center", target: st.id, color: color });
 
             // Fan out concepts
             if (!collapsedNodes.has(st.id)) {
                 const concepts = st.concepts || [];
                 concepts.forEach((c, cIdx) => {
                     const dist = 180; // Distance from subtopic
-                    // Slight spread based on index
-                    const spreadAngle = (cIdx - (concepts.length - 1) / 2) * 0.3; // 0.3 radians spread
+                    const spreadAngle = (cIdx - (concepts.length - 1) / 2) * 0.3;
                     const cAngle = angle + spreadAngle;
 
                     const cX = stX + Math.cos(cAngle) * dist;
                     const cY = stY + Math.sin(cAngle) * dist;
 
-                    nodes.push({
+                    newNodes.push({
                         id: c.id,
                         type: "concept",
                         label: c.name,
@@ -193,26 +198,89 @@ const MindMapTool = () => {
                         subtopicId: st.id
                     });
 
-                    links.push({ source: st.id, target: c.id, color: color });
+                    newLinks.push({ source: st.id, target: c.id, color: color });
                 });
             }
         });
 
-        return { nodes, links };
-    }, [mindMapData, collapsedNodes]);
+        // Merge with existing positions if IDs match (preserve drag state) or load from Cache
+        const savedLayout = localStorage.getItem(`mindmap_pos_${bookId}`);
+        const savedPosMap = savedLayout ? new Map(JSON.parse(savedLayout).map(p => [p.id, p])) : new Map();
+
+        setNodes(prevNodes => {
+            // Priority: 1. Currently active state (prevNodes) > 2. Saved Cache > 3. Default Radial
+            const currentPosMap = new Map(prevNodes.map(n => [n.id, { x: n.x, y: n.y }]));
+
+            return newNodes.map(n => {
+                // If we are just re-calculating due to data change (rare) or init
+                if (currentPosMap.has(n.id)) {
+                    return { ...n, x: currentPosMap.get(n.id).x, y: currentPosMap.get(n.id).y };
+                }
+                if (savedPosMap.has(n.id)) {
+                    return { ...n, x: savedPosMap.get(n.id).x, y: savedPosMap.get(n.id).y };
+                }
+                return n;
+            });
+        });
+        setLinks(newLinks);
+
+    }, [mindMapData, collapsedNodes, bookId]);
+
+    // --- Drag Handlers ---
+    const handleNodeMouseDown = (e, nodeId) => {
+        e.stopPropagation(); // Prevent canvas pan
+        setDraggingNodeId(nodeId);
+    };
+
+    const handleCanvasMouseMove = (e) => {
+        if (draggingNodeId) {
+            // Drag Node
+            const scale = zoom;
+            setNodes(prev => prev.map(n => {
+                if (n.id === draggingNodeId) {
+                    return {
+                        ...n,
+                        x: n.x + e.movementX / scale,
+                        y: n.y + e.movementY / scale
+                    };
+                }
+                return n;
+            }));
+        } else if (isDragging) {
+            // Pan Canvas
+            setPan({ x: pan.x + e.movementX, y: pan.y + e.movementY });
+        }
+    };
+
+    const handleCanvasMouseUp = () => {
+        if (draggingNodeId) {
+            // Save positions on drop
+            const posData = nodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
+            localStorage.setItem(`mindmap_pos_${bookId}`, JSON.stringify(posData));
+        }
+        setDraggingNodeId(null);
+        setIsDragging(false);
+    };
 
 
     // --- Render Helpers ---
     const renderNode = (node) => {
-        // Focus Mode: Dim if not in focused subtopic (and not center)
         const isDimmed = focusedSubtopic && node.type !== 'center' && node.subtopicId !== focusedSubtopic;
         const opacity = isDimmed ? 0.2 : 1;
+        const isSelected = draggingNodeId === node.id;
+
+        const commonProps = {
+            key: node.id,
+            transform: `translate(${node.x},${node.y})`,
+            style: { opacity, cursor: isDragging ? 'grabbing' : 'grab', transition: draggingNodeId === node.id ? 'none' : 'transform 0.3s, opacity 0.3s' },
+            onMouseDown: (e) => handleNodeMouseDown(e, node.id)
+        };
 
         if (node.type === 'center') {
             return (
-                <g key={node.id} transform={`translate(${node.x},${node.y})`} style={{ opacity, cursor: 'pointer', transition: 'all 0.3s' }}>
+                <g {...commonProps}>
                     <circle r="50" fill="#2D3436" stroke="#fff" strokeWidth="3" />
-                    <foreignObject x="-45" y="-30" width="90" height="60">
+                    <foreignObject x="-45" y="-30" width="90" height="60" style={{ pointerEvents: 'none' }}>
                         <div style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             height: '100%', color: 'white', textAlign: 'center',
@@ -228,22 +296,10 @@ const MindMapTool = () => {
         if (node.type === 'subtopic') {
             const isCollapsed = collapsedNodes.has(node.id);
             return (
-                <g
-                    key={node.id}
-                    transform={`translate(${node.x},${node.y})`}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        // Toggle Focus
-                        setFocusedSubtopic(curr => curr === node.id ? null : node.id);
-                    }}
-                    onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        toggleCollapse(node.id);
-                    }}
-                    style={{ opacity, cursor: 'pointer', transition: 'all 0.3s' }}
-                >
+                <g {...commonProps}>
+                    {/* Hit area for drag */}
                     <rect x="-60" y="-30" width="120" height="60" rx="15" fill={node.color} stroke="white" strokeWidth="2" />
-                    <foreignObject x="-55" y="-25" width="110" height="50">
+                    <foreignObject x="-55" y="-25" width="110" height="50" style={{ pointerEvents: 'none' }}>
                         <div style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             height: '100%', color: 'white', textAlign: 'center',
@@ -252,20 +308,26 @@ const MindMapTool = () => {
                             {node.label}
                         </div>
                     </foreignObject>
-                    {/* Expand/Collapse Indicator */}
-                    <circle cx="0" cy="30" r="8" fill="white" stroke={node.color} />
-                    <text x="0" y="33" textAnchor="middle" fontSize="10" fill={node.color}>
-                        {isCollapsed ? '+' : '-'}
-                    </text>
+
+                    {/* Interactive buttons must stop propagation to prevent drag start */}
+                    <g
+                        onClick={(e) => { e.stopPropagation(); toggleCollapse(node.id); }}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        <circle cx="0" cy="30" r="10" fill="white" stroke={node.color} />
+                        <text x="0" y="34" textAnchor="middle" fontSize="14" fontWeight="bold" fill={node.color}>
+                            {isCollapsed ? '+' : '-'}
+                        </text>
+                    </g>
                 </g>
             );
         }
 
         if (node.type === 'concept') {
             return (
-                <g key={node.id} transform={`translate(${node.x},${node.y})`} style={{ opacity, transition: 'all 0.3s' }}>
+                <g {...commonProps}>
                     <rect x="-50" y="-25" width="100" height="50" rx="8" fill="white" stroke={node.color} strokeWidth="2" />
-                    <foreignObject x="-48" y="-22" width="96" height="46">
+                    <foreignObject x="-48" y="-22" width="96" height="46" style={{ pointerEvents: 'none' }}>
                         <div style={{
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                             height: '100%', textAlign: 'center'
@@ -276,7 +338,6 @@ const MindMapTool = () => {
                         </div>
                     </foreignObject>
 
-                    {/* Details Dot */}
                     {node.details && node.details.length > 0 && (
                         <circle cx="50" cy="-25" r="6" fill="#F1C40F" />
                     )}
@@ -286,8 +347,8 @@ const MindMapTool = () => {
     };
 
     const renderLink = (link) => {
-        const sourceNode = layout.nodes.find(n => n.id === link.source);
-        const targetNode = layout.nodes.find(n => n.id === link.target);
+        const sourceNode = nodes.find(n => n.id === link.source);
+        const targetNode = nodes.find(n => n.id === link.target);
         if (!sourceNode || !targetNode) return null;
 
         const midX = (sourceNode.x + targetNode.x) / 2;
@@ -367,10 +428,10 @@ const MindMapTool = () => {
             {/* Canvas */}
             <div
                 className="mindmap-canvas"
-                onMouseDown={(e) => { setIsDragging(true); setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y }); }}
-                onMouseMove={(e) => { if (isDragging) setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); }}
-                onMouseUp={() => setIsDragging(false)}
-                onMouseLeave={() => setIsDragging(false)}
+                onMouseDown={(e) => { if (e.target === e.currentTarget || e.target.tagName === 'svg') setIsDragging(true); }}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseUp}
                 onWheel={handleWheel}
             >
                 <svg
@@ -380,10 +441,10 @@ const MindMapTool = () => {
                 >
                     <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
                         {/* Render Links First (Behind nodes) */}
-                        {layout.links.map(renderLink)}
+                        {links.map(renderLink)}
 
                         {/* Render Nodes */}
-                        {layout.nodes.map(renderNode)}
+                        {nodes.map(renderNode)}
                     </g>
                 </svg>
             </div>

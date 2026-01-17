@@ -1516,11 +1516,22 @@ DETAIL: [Brief Detail]
 CONNECTION: [Related Concept Name]
 
 Rules:
-1. NO DUPLICATES. Each Subtopic must be unique.
-2. Cover the ENTIRE chapter, not just one part.
-3. Max 8 Subtopics, 5 Concepts each.
-4. Use short, punchy names (1-4 words).
-5. START IMMEDIATELY with 'ROOT:'. Do not write any intro.
+1. **NO QUESTIONS**. Use clear NOUN PHRASES for all headings (e.g., "Water Distribution" instead of "How is water distributed?").
+2. **DIVERSITY**. Generate EXACTLY 10-12 unique Subtopics covering the **entire** chapter.
+3. **DEPTH**. Each Subtopic MUST have 3-5 Concepts.
+4. **NO DUPLICATES**. Do not repeat branch names.
+5. **START IMMEDIATELY** with 'ROOT:'.
+
+Example:
+ROOT: Earth's Atmosphere
+SUBTOPIC: Layers
+CONCEPT: Troposphere
+DETAIL: Weather occurs here
+CONCEPT: Stratosphere
+DETAIL: Contains ozone layer
+SUBTOPIC: Composition
+CONCEPT: Nitrogen
+DETAIL: 78% of atmosphere
 
 ### INPUT TEXT:
 {context[:6000]}
@@ -1529,8 +1540,8 @@ Rules:
 
         # 3. Generation
         print(f"🧠 Generating Mind Map (Line-Based Strategy)...")
-        # Removed manual "ROOT:" prepend to let model drive, but we enforce it via prompt
-        response_text = self.call_llama_optimized(prompt, num_predict=2000, temperature=0.3, format=None)
+        # Kept temp at 0.4 for creativity, but the prompt example guides structure
+        response_text = self.call_llama_optimized(prompt, num_predict=3000, temperature=0.4, format=None)
         
         # 4. Robust Line-Based Parser
         try:
