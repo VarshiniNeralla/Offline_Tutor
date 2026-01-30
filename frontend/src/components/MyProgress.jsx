@@ -20,10 +20,14 @@ import {
     MessageSquare,
     Star
 } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations";
 import "../assets/styles/student-dashboard.css";
 
 const MyProgress = () => {
     const navigate = useNavigate();
+    const { language } = useLanguage();
+    const t = translations[language];
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedAttempt, setSelectedAttempt] = useState(null);
@@ -76,10 +80,10 @@ const MyProgress = () => {
                         </button>
                         <div>
                             <h1 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>
-                                {selectedAttempt ? 'Attempt Review' : 'My Progress History'}
+                                {selectedAttempt ? t.progress.reviewTitle : t.progress.title}
                             </h1>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                {selectedAttempt ? `${selectedAttempt.book_name} • ${selectedAttempt.type.toUpperCase()}` : 'View your learning journey'}
+                                {selectedAttempt ? `${selectedAttempt.book_name} • ${t.tools.items[selectedAttempt.type] || selectedAttempt.type}` : t.progress.subtitle}
                             </p>
                         </div>
                     </div>
@@ -97,50 +101,53 @@ const MyProgress = () => {
                         >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                                 <div style={{ display: 'flex', gap: '12px' }}>
-                                    {['all', 'quiz', 'truefalse', 'flashcards', 'oral_test'].map(t => (
-                                        <button
-                                            key={t}
-                                            onClick={() => setFilterType(t)}
-                                            style={{
-                                                padding: '8px 16px',
-                                                borderRadius: '100px',
-                                                border: '1px solid var(--border)',
-                                                background: filterType === t ? 'var(--primary)' : 'white',
-                                                color: filterType === t ? 'white' : 'var(--text-muted)',
-                                                fontWeight: 600,
-                                                fontSize: '0.85rem',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s',
-                                                textTransform: 'capitalize'
-                                            }}
-                                        >
-                                            {t === 'truefalse' ? 'True/False' : (t === 'oral_test' ? 'Oral Test' : t)}
-                                        </button>
-                                    ))}
+                                    {['all', 'quiz', 'truefalse', 'flashcards', 'oral_test', 'summary'].map(typeKey => {
+                                        const label = typeKey === 'all' ? t.progress.all : (t.tools.items[typeKey] || typeKey);
+
+                                        return (
+                                            <button
+                                                key={typeKey}
+                                                onClick={() => setFilterType(typeKey)}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    borderRadius: '100px',
+                                                    border: '1px solid var(--border)',
+                                                    background: filterType === typeKey ? 'var(--primary)' : 'white',
+                                                    color: filterType === typeKey ? 'white' : 'var(--text-muted)',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.85rem',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                }}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                                 <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
-                                    Total Attempts: {filteredHistory.length}
+                                    {t.progress.totalAttempts}: {filteredHistory.length}
                                 </div>
                             </div>
 
                             {loading ? (
                                 <div style={{ textAlign: 'center', padding: '100px 0' }}>
                                     <div className="loader" style={{ margin: '0 auto 20px' }}></div>
-                                    <p style={{ color: 'var(--text-muted)' }}>Loading your records...</p>
+                                    <p style={{ color: 'var(--text-muted)' }}>{t.progress.loading}</p>
                                 </div>
                             ) : filteredHistory.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: '100px 20px', background: 'white', borderRadius: '24px', border: '1px dashed var(--border)' }}>
                                     <History size={48} color="var(--border)" style={{ marginBottom: '16px' }} />
-                                    <h3 style={{ margin: 0, color: 'var(--text-main)' }}>No history yet</h3>
-                                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Start a quiz to see your progress here!</p>
+                                    <h3 style={{ margin: 0, color: 'var(--text-main)' }}>{t.progress.noHistory}</h3>
+                                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>{t.progress.startQuiz}</p>
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     {filteredHistory.map((attempt) => (
                                         <motion.div
-                                            key={attempt.id}
+                                            key={attempt.attempt_id}
                                             className="glass-card"
-                                            whileHover={{ scale: 1.01, borderColor: 'var(--primary-light)' }}
+                                            whileHover={{ scale: 1.01, borderColor: '#94a3b8' }}
                                             onClick={() => setSelectedAttempt(attempt)}
                                             style={{
                                                 padding: '20px',
@@ -175,11 +182,11 @@ const MyProgress = () => {
                                             <div style={{ textAlign: 'right' }}>
                                                 {attempt.status === "PENDING_REVIEW" ? (
                                                     <div style={{ padding: '4px 12px', borderRadius: '8px', background: '#fffbeb', color: '#b45309', fontSize: '0.75rem', fontWeight: 700 }}>
-                                                        PENDING REVIEW
+                                                        {t.progress.pendingReview}
                                                     </div>
                                                 ) : attempt.status === "AI_REVIEWED" ? (
                                                     <div style={{ padding: '4px 12px', borderRadius: '8px', background: '#e0f2fe', color: '#0369a1', fontSize: '0.75rem', fontWeight: 700 }}>
-                                                        AI REVIEWED
+                                                        {t.progress.aiReviewed}
                                                     </div>
                                                 ) : (
                                                     <>
@@ -191,7 +198,7 @@ const MyProgress = () => {
                                                             {attempt.type === 'flashcards' ? (attempt.metadata?.known_count || 0) : attempt.score}/{attempt.type === 'oral_test' ? attempt.total_questions * 5 : attempt.total_questions}
                                                         </div>
                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                                            {attempt.type === 'oral_test' ? 'Score' : 'Result'}
+                                                            {attempt.type === 'oral_test' ? t.progress.score : t.progress.result}
                                                         </div>
                                                     </>
                                                 )}
@@ -220,7 +227,7 @@ const MyProgress = () => {
                                             : (selectedAttempt.status === 'PENDING_REVIEW' ? '---' : `${selectedAttempt.score}/${selectedAttempt.total_questions * (selectedAttempt.type === 'oral_test' ? 5 : 1)}`)}
                                     </div>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                        {selectedAttempt.type === 'flashcards' ? 'Mastered' : (selectedAttempt.status === 'AI_REVIEWED' ? 'Total Score (AI)' : 'Total Score')}
+                                        {selectedAttempt.type === 'flashcards' ? t.progress.mastered : (selectedAttempt.status === 'AI_REVIEWED' ? `${t.progress.score} (AI)` : t.progress.score)}
                                     </div>
                                 </div>
                                 <div className="stat-card" style={{ background: 'white', padding: '20px', borderRadius: '20px', border: '1px solid var(--border)', textAlign: 'center' }}>
@@ -231,7 +238,7 @@ const MyProgress = () => {
                                             : (selectedAttempt.status === 'PENDING_REVIEW' ? '0' : Math.round((selectedAttempt.score / (selectedAttempt.total_questions * (selectedAttempt.type === 'oral_test' ? 5 : 1))) * 100))}%
                                     </div>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                        {selectedAttempt.status === 'AI_REVIEWED' ? 'Accuracy (AI)' : 'Accuracy'}
+                                        {selectedAttempt.status === 'AI_REVIEWED' ? `${t.progress.accuracy} (AI)` : t.progress.accuracy}
                                     </div>
                                 </div>
                                 <div className="stat-card" style={{ background: 'white', padding: '20px', borderRadius: '20px', border: '1px solid var(--border)', textAlign: 'center' }}>
@@ -239,18 +246,18 @@ const MyProgress = () => {
                                     <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
                                         {selectedAttempt.metadata?.duration_seconds
                                             ? `${Math.floor(selectedAttempt.metadata.duration_seconds / 60)}m ${Math.floor(selectedAttempt.metadata.duration_seconds % 60)}s`
-                                            : (selectedAttempt.status === "PENDING_REVIEW" ? "Pending" : (selectedAttempt.status === "AI_REVIEWED" ? "AI Reviewed" : "Teacher Reviewed"))}
+                                            : (selectedAttempt.status === "PENDING_REVIEW" ? t.progress.pendingReview : (selectedAttempt.status === "AI_REVIEWED" ? t.progress.aiReviewed : "Reviewed"))}
                                     </div>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                        {selectedAttempt.metadata?.duration_seconds ? 'Duration' : 'Review Status'}
+                                        {selectedAttempt.metadata?.duration_seconds ? t.progress.duration : t.progress.reviewStatus}
                                     </div>
                                 </div>
                             </div>
 
                             {/* Detailed List */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <h3 style={{ margin: '0 0 -8px', fontSize: '1.2rem', fontWeight: 700 }}>
-                                    {selectedAttempt.type === 'flashcards' ? 'Cards Studied' : (selectedAttempt.type === 'oral_test' ? 'Test Questions' : 'Question Review')}
+                                <h3 style={{ margin: '0 -8px', fontSize: '1.2rem', fontWeight: 700 }}>
+                                    {selectedAttempt.type === 'flashcards' ? t.tools.items.flashcards : (selectedAttempt.type === 'oral_test' ? t.tools.items.oralTests : t.progress.questionReview)}
                                 </h3>
 
                                 {selectedAttempt.type === 'flashcards' ? (
@@ -274,7 +281,7 @@ const MyProgress = () => {
                                                                     background: isKnown ? '#f0fdf4' : '#fffbeb',
                                                                     padding: '4px 8px', borderRadius: '100px'
                                                                 }}>
-                                                                    {isKnown ? 'Mastered' : 'Review Again'}
+                                                                    {isKnown ? t.flash.known : t.flash.reviewAgain}
                                                                 </span>
                                                             </div>
                                                             <div>
@@ -379,7 +386,7 @@ const MyProgress = () => {
                                                     ) : (
                                                         <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '16px', border: '1px solid #fde68a', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                             <Clock size={20} color="#b45309" />
-                                                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#92400e', fontWeight: 500 }}>Waiting for teacher review.</p>
+                                                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#92400e', fontWeight: 500 }}>{t.progress.pendingReview}.</p>
                                                         </div>
                                                     )}
                                                 </div>
@@ -410,7 +417,7 @@ const MyProgress = () => {
                                                         padding: '4px 10px', borderRadius: '100px'
                                                     }}>
                                                         {isCorrect ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                                        {isCorrect ? 'Correct' : 'Incorrect'}
+                                                        {isCorrect ? t.progress.correct : t.progress.incorrect}
                                                     </div>
                                                 </div>
 
@@ -449,13 +456,13 @@ const MyProgress = () => {
                                                 ) : (
                                                     <div style={{ display: 'flex', gap: '20px', marginBottom: '16px' }}>
                                                         <div style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '4px' }}>YOUR ANSWER</div>
+                                                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '4px' }}>{t.progress.yourAnswer}</div>
                                                             <div style={{ fontWeight: 700, color: q.user_answer === q.correct_answer ? '#10b981' : '#f43f5e' }}>
                                                                 {q.user_answer ? 'True' : 'False'}
                                                             </div>
                                                         </div>
                                                         <div style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '4px' }}>CORRECT KEY</div>
+                                                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '4px' }}>{t.progress.correctKey}</div>
                                                             <div style={{ fontWeight: 700, color: '#10b981' }}>
                                                                 {q.correct_answer ? 'True' : 'False'}
                                                             </div>
@@ -464,7 +471,7 @@ const MyProgress = () => {
                                                 )}
 
                                                 <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '12px', fontSize: '0.9rem', color: '#475569', lineHeight: 1.6 }}>
-                                                    <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.75rem', color: '#64748b' }}>EXPLANATION & CONTEXT</strong>
+                                                    <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.75rem', color: '#64748b' }}>{t.progress.explanation.toUpperCase()}</strong>
                                                     {q.explanation}
                                                 </div>
                                             </div>

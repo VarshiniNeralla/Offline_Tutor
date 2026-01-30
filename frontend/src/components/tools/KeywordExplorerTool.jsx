@@ -17,11 +17,15 @@ import {
     Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLanguage } from '../../context/LanguageContext';
+import { translations } from '../../translations';
 import '../../assets/styles/student-dashboard.css';
 
 const KeywordExplorerTool = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { language } = useLanguage();
+    const t = translations[language];
 
     // context passed from Dashboard
     const { subject, bookId, bookName, class: className, role = 'student' } = location.state || {};
@@ -84,7 +88,7 @@ const KeywordExplorerTool = () => {
                     message: "Generative Keyword Extraction",
                     subjects: [subject],
                     book_ids: [bookId],
-                    language: 'english',
+                    language: language,
                     mode: 'keywords'
                 })
             });
@@ -207,9 +211,9 @@ const KeywordExplorerTool = () => {
                             <ChevronLeft size={22} />
                         </button>
                         <div>
-                            <h1 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>Keyword Explorer: {bookName}</h1>
+                            <h1 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>{t.tools.items.keywords}: {bookName}</h1>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                {role === 'teacher' ? 'Edit and manage vocabulary' : 'Unlock academic vocabulary'}
+                                {role === 'teacher' ? 'Edit and manage vocabulary' : t.keywords.smartGlossary}
                             </p>
                         </div>
                     </div>
@@ -282,33 +286,43 @@ const KeywordExplorerTool = () => {
 };
 
 // Sub-components
-const LoadingView = ({ progress }) => (
-    <div style={{ textAlign: 'center', padding: '60px' }}>
-        <div className="spinner-large" style={{ margin: '0 auto 24px' }}>
-            <Brain size={40} className="zap-spin" style={{ color: 'var(--primary)' }} />
+const LoadingView = ({ progress }) => {
+    const { language } = useLanguage();
+    const t = translations[language];
+    return (
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+            <div className="spinner-large" style={{ margin: '0 auto 24px' }}>
+                <Brain size={40} className="zap-spin" style={{ color: 'var(--primary)' }} />
+            </div>
+            <h3>{t.keywords.analyzing}</h3>
+            <p style={{ marginBottom: '20px' }}>{t.keywords.extractionDesc}</p>
+            <div className="progress-container-v2" style={{ margin: '0 auto', maxWidth: '300px', background: '#e2e8f0', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
+                <div
+                    className="progress-fill-v2"
+                    style={{ width: `${progress}%`, height: '100%', background: 'var(--primary)', transition: 'width 0.3s ease' }}
+                />
+            </div>
+            <p style={{ marginTop: '10px', fontWeight: 600, color: 'var(--primary)' }}>{progress}%</p>
         </div>
-        <h3>Mining Textbooks...</h3>
-        <p style={{ marginBottom: '20px' }}>extracting key concepts and definitions</p>
-        <div className="progress-container-v2" style={{ margin: '0 auto', maxWidth: '300px', background: '#e2e8f0', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
-            <div
-                className="progress-fill-v2"
-                style={{ width: `${progress}%`, height: '100%', background: 'var(--primary)', transition: 'width 0.3s ease' }}
-            />
-        </div>
-        <p style={{ marginTop: '10px', fontWeight: 600, color: 'var(--primary)' }}>{progress}%</p>
-    </div>
-);
+    );
+};
 
-const ErrorView = ({ message, onRetry }) => (
-    <div style={{ textAlign: 'center', padding: '60px', color: '#ef4444' }}>
-        <AlertCircle size={48} style={{ marginBottom: '16px' }} />
-        <h3>Extraction Failed</h3>
-        <p>{message}</p>
-        <button className="primary-btn" onClick={onRetry} style={{ marginTop: '20px' }}>Try Again</button>
-    </div>
-);
+const ErrorView = ({ message, onRetry }) => {
+    const { language } = useLanguage();
+    const t = translations[language];
+    return (
+        <div style={{ textAlign: 'center', padding: '60px', color: '#ef4444' }}>
+            <AlertCircle size={48} style={{ marginBottom: '16px' }} />
+            <h3>{t.tools.errorHeader || 'Extraction Failed'}</h3>
+            <p>{message}</p>
+            <button className="primary-btn" onClick={onRetry} style={{ marginTop: '20px' }}>{t.quiz.retry}</button>
+        </div>
+    );
+};
 
 const KeywordContent = ({ data, viewMode, setViewMode, searchQuery, setSearchQuery, isEditing, onTermChange, onDefChange, onToggleExam, onDelete }) => {
+    const { language } = useLanguage();
+    const t = translations[language];
     // Filter Logic
     const filtered = data.filter(k =>
         k.term.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -335,7 +349,7 @@ const KeywordContent = ({ data, viewMode, setViewMode, searchQuery, setSearchQue
                     <Search size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                     <input
                         type="text"
-                        placeholder="Search keywords..."
+                        placeholder={t.keywords.searchPlaceholder}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         style={{

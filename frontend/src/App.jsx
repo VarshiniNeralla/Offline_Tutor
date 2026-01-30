@@ -8,6 +8,7 @@ import StudentAuth from './components/StudentAuth';
 import StudentDashboard from './components/StudentDashboard';
 import ChatInterface from './components/ChatInterface';
 import AdminDashboard from './components/AdminDashboard';
+import { LanguageProvider } from './context/LanguageContext';
 
 import QuizTool from './components/tools/QuizTool';
 import SummaryTool from './components/tools/SummaryTool';
@@ -16,6 +17,7 @@ import TrueFalseTool from './components/tools/TrueFalseTool';
 import FlashcardsTool from './components/tools/FlashcardsTool';
 import OralTestTool from './components/tools/OralTestTool';
 import MindMapTool from './components/tools/MindMapTool';
+import OnePageRevisionTool from './components/tools/OnePageRevisionTool';
 import MyProgress from './components/MyProgress';
 
 // Wrapper for AnimatePresence to work with Routes
@@ -36,6 +38,7 @@ const AnimatedRoutes = () => {
                 <Route path="/flashcards" element={<FlashcardsTool />} />
                 <Route path="/oraltest" element={<OralTestTool />} />
                 <Route path="/mindmap" element={<MindMapTool />} />
+                <Route path="/revision" element={<OnePageRevisionTool />} />
                 <Route path="/student/progress" element={<MyProgress />} />
                 <Route path="/teacher" element={<AdminDashboard />} />
             </Routes>
@@ -46,9 +49,11 @@ const AnimatedRoutes = () => {
 function App() {
     return (
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <div className="bg-[#0a0f1c] min-h-screen text-white font-sans selection:bg-blue-500/30">
-                <AnimatedRoutes />
-            </div>
+            <LanguageProvider>
+                <div className="bg-[#0a0f1c] min-h-screen text-white font-sans selection:bg-blue-500/30">
+                    <AnimatedRoutes />
+                </div>
+            </LanguageProvider>
         </Router>
     );
 }

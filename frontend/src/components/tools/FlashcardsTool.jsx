@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLanguage } from "../../context/LanguageContext";
 import {
     ChevronLeft,
     Sparkles,
@@ -14,11 +15,14 @@ import {
     RotateCcw,
     AlertCircle
 } from "lucide-react";
+import { translations } from "../../translations";
 import "../../assets/styles/student-dashboard.css";
 
 const FlashcardsTool = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { language } = useLanguage();
+    const t = translations[language];
     const { bookId, bookName, subject, className } = location.state || {};
 
     const [view, setView] = useState('SETUP'); // SETUP, LOADING, STUDY, SUMMARY
@@ -71,7 +75,7 @@ const FlashcardsTool = () => {
                     subjects: [subject],
                     book_ids: [bookId],
                     mode: 'flashcards',
-                    language: 'english'
+                    language: language
                 })
             });
 
@@ -90,10 +94,23 @@ const FlashcardsTool = () => {
             }
 
             try {
+                // Attempt direct parse first
                 cards = typeof data.response === 'string' ? JSON.parse(data.response) : data.response;
             } catch (e) {
-                console.error("JSON Parsing failed for cards:", data.response);
-                throw new Error("AI generated invalid data. Please try again.");
+                console.warn("Direct JSON parse failed, attempting extraction...", e);
+                const responseStr = data.response;
+                // If it fails, try to extract the JSON array [ ... ]
+                const match = String(responseStr).match(/\[[\s\S]*\]/);
+                if (match) {
+                    try {
+                        cards = JSON.parse(match[0]);
+                    } catch (e2) {
+                        console.error("Extraction parse failed", e2);
+                        throw new Error("AI generated invalid JSON. Please try again.");
+                    }
+                } else {
+                    throw new Error("No valid data found in AI response.");
+                }
             }
 
             if (!Array.isArray(cards) || cards.length === 0) {
@@ -326,7 +343,7 @@ const FlashcardsTool = () => {
                             <ChevronLeft size={22} />
                         </button>
                         <div>
-                            <h1 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>Flashcards Study</h1>
+                            <h1 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>{t.tools.items.flashcards}</h1>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{bookName} • {subject}</p>
                         </div>
                     </div>
@@ -351,14 +368,14 @@ const FlashcardsTool = () => {
                             }}>
                                 <Layers size={32} />
                             </div>
-                            <h2 style={{ fontSize: '1.6rem', marginBottom: '12px' }}>Ready to Memorize?</h2>
+                            <h2 style={{ fontSize: '1.6rem', marginBottom: '12px' }}>{t.flash.prepareHeader}</h2>
                             <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>
-                                We'll generate AI flashcards from your textbook to help you learn faster.
+                                {t.flash.prepareSubheader}
                             </p>
 
                             <div style={{ marginBottom: '40px' }}>
                                 <p style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '16px' }}>
-                                    How many cards do you want?
+                                    {t.flash.howMany}
                                 </p>
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
                                     {[10, 20, 30].map(count => (
@@ -377,7 +394,7 @@ const FlashcardsTool = () => {
                                                 cursor: 'pointer'
                                             }}
                                         >
-                                            {count} Cards
+                                            {count} {t.flash.cards}
                                         </button>
                                     ))}
                                 </div>
@@ -398,7 +415,7 @@ const FlashcardsTool = () => {
                                 className="primary-btn"
                                 style={{ width: '100%', padding: '18px', fontSize: '1rem' }}
                             >
-                                Generate NEW Flashcards <Sparkles size={18} style={{ marginLeft: '8px' }} />
+                                {t.flash.generateNew} <Sparkles size={18} style={{ marginLeft: '8px' }} />
                             </button>
 
                             {localStorage.getItem(getCacheKey(cardCount)) && (
@@ -410,7 +427,7 @@ const FlashcardsTool = () => {
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                                     }}
                                 >
-                                    <RotateCcw size={16} /> Continue Previous Session
+                                    <RotateCcw size={16} /> {t.flash.continue}
                                 </button>
                             )}
                         </motion.div>
@@ -425,8 +442,8 @@ const FlashcardsTool = () => {
                             style={{ textAlign: 'center', padding: '60px 0' }}
                         >
                             <div className="loader" style={{ margin: '0 auto 24px' }}></div>
-                            <h3 style={{ fontSize: '1.4rem' }}>Creating your study deck...</h3>
-                            <p style={{ color: 'var(--text-muted)' }}>AI is scanning "{bookName}" for the most important facts.</p>
+                            <h3 style={{ fontSize: '1.4rem' }}>{t.flash.creatingDeck}</h3>
+                            <p style={{ color: 'var(--text-muted)' }}>{t.flash.reading}</p>
                         </motion.div>
                     )}
 
@@ -441,7 +458,7 @@ const FlashcardsTool = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     <div style={{ background: 'white', padding: '6px 12px', borderRadius: '100px', border: '1px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700 }}>
-                                        Card {currentIndex + 1} of {flashcards.length}
+                                        {t.flash.card} {currentIndex + 1} {t.oral.of} {flashcards.length}
                                     </div>
                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         <Clock size={14} /> {formatTime(elapsedTime * 1000)}
@@ -503,7 +520,7 @@ const FlashcardsTool = () => {
                                                 className="hint-box"
                                                 style={{ opacity: showHint ? 1 : 0.6 }}
                                             >
-                                                {showHint ? flashcards[currentIndex].hint : "Show Hint?"}
+                                                {showHint ? flashcards[currentIndex].hint : t.flash.showHint}
                                             </div>
                                         )}
                                     </div>
@@ -525,7 +542,7 @@ const FlashcardsTool = () => {
                                         opacity: isFlipped ? 1 : 0.6
                                     }}
                                 >
-                                    <RefreshCw size={20} /> Review Again
+                                    <RefreshCw size={20} /> {t.flash.reviewAgain}
                                 </button>
                                 <button
                                     className="primary-btn"
@@ -540,7 +557,7 @@ const FlashcardsTool = () => {
                                         opacity: isFlipped ? 1 : 0.6
                                     }}
                                 >
-                                    <CheckCircle2 size={20} /> I Know This
+                                    <CheckCircle2 size={20} /> {t.flash.iKnowThis}
                                 </button>
                             </div>
 
@@ -549,7 +566,7 @@ const FlashcardsTool = () => {
                                 onClick={nextCard}
                                 style={{ width: '100%', marginTop: '16px', background: 'white', border: '1px solid #e2e8f0', color: 'var(--text-muted)', gap: '8px' }}
                             >
-                                Skip to Next Card <ArrowRight size={18} />
+                                {t.flash.skip} <ArrowRight size={18} />
                             </button>
 
                             {/* <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
@@ -567,21 +584,21 @@ const FlashcardsTool = () => {
                             style={{ padding: '48px', textAlign: 'center' }}
                         >
                             <Trophy size={64} color="#f59e0b" style={{ margin: '0 auto 24px' }} />
-                            <h2 style={{ fontSize: '1.8rem', marginBottom: '8px' }}>Session Complete!</h2>
-                            <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>Great focus today. Here's how you did:</p>
+                            <h2 style={{ fontSize: '1.8rem', marginBottom: '8px' }}>{t.flash.complete}</h2>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>{t.flash.summaryHeader}</p>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '48px' }}>
                                 <div style={{ padding: '20px', background: '#f0fdf4', borderRadius: '24px', border: '1px solid #bcf0da' }}>
                                     <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#166534' }}>{knownCards.size}</div>
-                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>Known</div>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>{t.flash.known}</div>
                                 </div>
                                 <div style={{ padding: '20px', background: '#fffbeb', borderRadius: '24px', border: '1px solid #fde68a' }}>
                                     <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#92400e' }}>{reviewCards.size}</div>
-                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Review</div>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>{t.flash.review}</div>
                                 </div>
                                 <div style={{ padding: '20px', background: '#eff6ff', borderRadius: '24px', border: '1px solid #dbeafe' }}>
                                     <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e40af' }}>{formatTime(elapsedTime * 1000)}</div>
-                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>Time</div>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>{t.flash.time}</div>
                                 </div>
                             </div>
 

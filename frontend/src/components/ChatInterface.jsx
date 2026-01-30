@@ -237,7 +237,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import { useLanguage } from "../context/LanguageContext";
 
+import { translations } from "../translations";
 import "../assets/styles/chat-interface.css";
 
 const ChatInterface = () => {
@@ -262,7 +264,8 @@ const ChatInterface = () => {
   const [activeChatId, setActiveChatId] = useState(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [language, setLanguage] = useState("english");
+  const { language, setLanguage } = useLanguage();
+  const t = translations[language];
   const [listening, setListening] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
@@ -329,50 +332,38 @@ const ChatInterface = () => {
     if (!targetBId) return;
 
     // Custom Greeting based on Tool
-    let initialMsg = `You are studying "${targetBName}". Ask anything from this textbook.`;
-    let title = "New Chat";
+    let initialMsg = t.chat.studyMessage.replace('{book}', targetBName);
+    let title = t.chat.newChat;
 
     if (toolType) {
       title = `${toolType.charAt(0).toUpperCase() + toolType.slice(1)} Mode`;
       switch (toolType) {
         case 'quiz':
-          initialMsg = `I'm ready to generate a **Quiz** for *${targetBName}*. \n\nHow many questions would you like, and on which chapter?`;
+          initialMsg = t.chat.quizMsg.replace('{book}', targetBName);
           break;
         case 'flashcards':
-          initialMsg = `Let's create **Flashcards** for *${targetBName}*. \n\nWhich topic should I focus on?`;
+          initialMsg = t.chat.flashMsg.replace('{book}', targetBName);
           break;
         case 'summary':
-          initialMsg = `I can write a **Summary** for *${targetBName}*. \n\nDo you want a brief overview or a detailed Chapter summary?`;
+          initialMsg = t.chat.summaryMsg.replace('{book}', targetBName);
           break;
         case 'mindmap':
-          initialMsg = `I'll help you structure a **Mind Map** for *${targetBName}*. \n\nWhat is the central concept you want to map out?`;
+          initialMsg = t.chat.mindmapMsg.replace('{book}', targetBName);
           break;
         case 'oral':
-          initialMsg = `Ready for your **Oral Test** on *${targetBName}*. \n\nI'll ask you questions one by one. Shall we begin?`;
+          initialMsg = t.chat.oralMsg.replace('{book}', targetBName);
           break;
-        case 'match':
-          initialMsg = `Let's play **Match the Following** with concepts from *${targetBName}*. \n\nReady for the first set?`;
-          break;
-        case 'truefalse':
-          initialMsg = `I'll give you **True or False** statements from *${targetBName}*. \n\nPrepare yourself! Type 'Start' when ready.`;
+        case 'tfMsg':
+          initialMsg = t.chat.tfMsg.replace('{book}', targetBName);
           break;
         case 'revision':
-          initialMsg = `I'll generate a **One Page Revision Sheet** for *${targetBName}*. \n\nWhich chapter are we compressing today?`;
-          break;
-        case 'doubt':
-          initialMsg = `**Doubt Detector** active. \n\nPaste the paragraph from *${targetBName}* that is confusing you.`;
-          break;
-        case 'compare':
-          initialMsg = `**Compare & Contrast** mode. \n\nWhich two concepts from *${targetBName}* should we analyze side-by-side?`;
-          break;
-        case 'missed':
-          initialMsg = `**Gap Analysis** mode. \n\nPaste your answer relating to *${targetBName}* and I'll tell you what points you missed.`;
+          initialMsg = t.chat.revisionMsg.replace('{book}', targetBName);
           break;
         case 'keywords':
-          initialMsg = `**Keyword Explorer**. \n\nList the terms from *${targetBName}* you want defined instantly.`;
+          initialMsg = t.chat.keywordsMsg.replace('{book}', targetBName);
           break;
         default:
-          initialMsg = `I'm ready to help with the **${toolType}** tool for *${targetBName}*. What do you need?`;
+          initialMsg = t.chat.defaultToolMsg.replace('{book}', targetBName).replace('{tool}', toolType);
       }
     }
 
@@ -451,7 +442,7 @@ const ChatInterface = () => {
     } catch {
       const errorMessage = {
         role: "assistant",
-        content: "I couldn't access the textbook right now.",
+        content: t.chat.error,
         sources: []
       };
       setChats(prev => prev.map(c =>
@@ -486,13 +477,13 @@ const ChatInterface = () => {
       <aside className={`chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <button className="new-chat-btn" onClick={() => startNewChat()}>
-            <Sparkles size={16} /> New chat
+            <Sparkles size={16} /> {t.chat.newChat}
           </button>
         </div>
 
         <div className="sidebar-content">
           <div className="history-group">
-            <span className="group-label">Previous Chats</span>
+            <span className="group-label">{t.chat.previousChats}</span>
             <div className="history-list">
               {filteredChats.map(chat => (
                 <div
@@ -521,7 +512,7 @@ const ChatInterface = () => {
             </div>
             <div className="user-info">
               <span className="user-name">{localStorage.getItem("studentName") || "Student"}</span>
-              <span className="user-status">Online</span>
+              <span className="user-status">{t.chat.online}</span>
             </div>
           </div>
         </div>
@@ -537,7 +528,7 @@ const ChatInterface = () => {
             </button>
 
             <div className="chat-context">
-              <h1>{currentChat?.title || "AI Tutor"}</h1>
+              <h1>{currentChat?.title || t.chat.title}</h1>
               {currentChat && (
                 <p>
                   <BookOpen size={12} /> {currentChat.bookName?.replace(/\.pdf$/i, '')} • {currentChat.subject}
@@ -552,7 +543,7 @@ const ChatInterface = () => {
               onChange={(e) => setLanguage(e.target.value)}
             >
               <option value="english">English</option>
-              <option value="telugu">Telugu</option>
+              <option value="telugu">తెలుగు</option>
             </select>
           </div>
         </header>
@@ -589,10 +580,13 @@ const ChatInterface = () => {
 
             {loading && (
               <motion.div className="chat-bubble assistant">
-                <div className="typing">
-                  <span />
-                  <span />
-                  <span />
+                <div className="chat-text">
+                  <div className="typing">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                  <span className="typing-text">{t.chat.analyzing}</span>
                 </div>
               </motion.div>
             )}
@@ -612,7 +606,7 @@ const ChatInterface = () => {
             </button>
 
             <input
-              placeholder={currentChat ? `Ask about ${currentChat.bookName?.replace(/\.pdf$/i, '')}...` : "Select a chat to begin..."}
+              placeholder={currentChat ? t.chat.placeholder : t.dashboard.selectSubject}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}

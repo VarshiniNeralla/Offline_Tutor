@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../context/LanguageContext';
 import {
     ArrowLeft, RefreshCw, ZoomIn, ZoomOut,
     Maximize, Minimize, Share2, Download,
     AlertCircle, Network, Layers
 } from 'lucide-react';
+import { translations } from '../../translations';
 import "../../assets/styles/mind-map.css";
 
 const MindMapTool = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { language } = useLanguage();
+    const t = translations[language];
     const { bookId, bookName, subject } = location.state || {};
 
     // --- State ---
@@ -63,7 +67,7 @@ const MindMapTool = () => {
         setError(null);
 
         try {
-            const response = await fetch("http://localhost:8001/api/chat", {
+            const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -71,21 +75,20 @@ const MindMapTool = () => {
                     mode: "mindmap",
                     book_ids: [bookId],
                     subjects: [subject || "General"],
-                    language: "en"
+                    language: language
                 })
             });
 
             const data = await response.json();
 
             if (data.status === "error") {
-                setError(data.response || "Failed to generate mind map.");
+                setError(data.response || t.mindmap.failed);
             } else {
                 setMindMapData(data.response);
-                console.log("🧠 Mind Map Data Received:", data.response); // DEBUG
                 localStorage.setItem(`mindmap_v1_${bookId}`, JSON.stringify(data.response));
             }
         } catch (err) {
-            setError("Network error. Please check backend.");
+            setError(t.quiz.errorHeader || "Network error. Please check backend.");
         } finally {
             setLoading(false);
             setRegenerating(false);
@@ -93,7 +96,7 @@ const MindMapTool = () => {
     };
 
     const handleRegenerate = () => {
-        if (window.confirm("Regenerating will replace the existing mind map. This cannot be undone.")) {
+        if (window.confirm(t.mindmap.confirmRegenerate)) {
             localStorage.removeItem(`mindmap_pos_${bookId}`); // Clear saved positions
             setRegenerating(true);
             fetchMindMap(true);
@@ -101,16 +104,21 @@ const MindMapTool = () => {
     };
 
     // --- Interaction ---
-    const handleWheel = (e) => {
-        if (e.ctrlKey) {
-            e.preventDefault();
-            setZoom(z => Math.max(0.1, Math.min(3, z - e.deltaY * 0.001)));
-        } else {
-            // For standard scrolling environments, e.ctrlKey handles zoom.
-            // If not prevented, wheel might scroll page.
-            // Since we use overflow:hidden, page won't scroll, but good to handle.
-        }
-    };
+    // Use effect to add wheel listener as non-passive to allow preventDefault for zooming
+    useEffect(() => {
+        const canvas = svgRef.current?.parentElement;
+        if (!canvas) return;
+
+        const onWheel = (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                setZoom(z => Math.max(0.1, Math.min(3, z - e.deltaY * 0.001)));
+            }
+        };
+
+        canvas.addEventListener('wheel', onWheel, { passive: false });
+        return () => canvas.removeEventListener('wheel', onWheel);
+    }, []);
 
     // Manual Zoom
     const handleZoomIn = () => setZoom(z => Math.min(3, z + 0.2));
@@ -141,7 +149,23 @@ const MindMapTool = () => {
         // Settings
         const CENTER_X = 400;
         const CENTER_Y = 300;
-        const SUBTOPIC_RADIUS = 250;
+
+        // Dynamic Layout Calculation
+        const subtopicCount = mindMapData.subtopics?.length || 0;
+
+        // DUAL RING LAYOUT (Zig-Zag)
+        // Helps prevent clutter by alternating distances
+        const INNER_RADIUS = 320;
+        const OUTER_RADIUS = 550; // Big jump to clear text
+
+        // Calculate Auto-Fit Zoom based on the outer ring
+        const maxExtent = OUTER_RADIUS + 250;
+        const fitZoom = Math.min(1, 550 / maxExtent);
+
+        // Only apply auto-zoom on FIRST load (not drag updates)
+        if (nodes.length === 0 && !localStorage.getItem(`mindmap_pos_${bookId}`)) {
+            setZoom(fitZoom);
+        }
 
         // 1. Center Node
         newNodes.push({
@@ -157,8 +181,13 @@ const MindMapTool = () => {
 
         subtopics.forEach((st, stIdx) => {
             const angle = stIdx * angleStep;
-            const stX = CENTER_X + Math.cos(angle) * SUBTOPIC_RADIUS;
-            const stY = CENTER_Y + Math.sin(angle) * SUBTOPIC_RADIUS;
+
+            // ALTERNATING RADIUS: Even = Inner, Odd = Outer
+            const isOuter = stIdx % 2 !== 0;
+            const radius = isOuter ? OUTER_RADIUS : INNER_RADIUS;
+
+            const stX = CENTER_X + Math.cos(angle) * radius;
+            const stY = CENTER_Y + Math.sin(angle) * radius;
             const color = getSubtopicColor(stIdx);
 
             // Subtopic Node
@@ -179,8 +208,11 @@ const MindMapTool = () => {
             if (!collapsedNodes.has(st.id)) {
                 const concepts = st.concepts || [];
                 concepts.forEach((c, cIdx) => {
-                    const dist = 180; // Distance from subtopic
-                    const spreadAngle = (cIdx - (concepts.length - 1) / 2) * 0.3;
+                    // Concepts also need more space if on inner ring
+                    const dist = 160;
+
+                    // Fan spread calculation
+                    const spreadAngle = (cIdx - (concepts.length - 1) / 2) * 0.35;
                     const cAngle = angle + spreadAngle;
 
                     const cX = stX + Math.cos(cAngle) * dist;
@@ -270,7 +302,6 @@ const MindMapTool = () => {
         const isSelected = draggingNodeId === node.id;
 
         const commonProps = {
-            key: node.id,
             transform: `translate(${node.x},${node.y})`,
             style: { opacity, cursor: isDragging ? 'grabbing' : 'grab', transition: draggingNodeId === node.id ? 'none' : 'transform 0.3s, opacity 0.3s' },
             onMouseDown: (e) => handleNodeMouseDown(e, node.id)
@@ -278,7 +309,7 @@ const MindMapTool = () => {
 
         if (node.type === 'center') {
             return (
-                <g {...commonProps}>
+                <g key={node.id} {...commonProps}>
                     <circle r="50" fill="#2D3436" stroke="#fff" strokeWidth="3" />
                     <foreignObject x="-45" y="-30" width="90" height="60" style={{ pointerEvents: 'none' }}>
                         <div style={{
@@ -296,7 +327,7 @@ const MindMapTool = () => {
         if (node.type === 'subtopic') {
             const isCollapsed = collapsedNodes.has(node.id);
             return (
-                <g {...commonProps}>
+                <g key={node.id} {...commonProps}>
                     {/* Hit area for drag */}
                     <rect x="-60" y="-30" width="120" height="60" rx="15" fill={node.color} stroke="white" strokeWidth="2" />
                     <foreignObject x="-55" y="-25" width="110" height="50" style={{ pointerEvents: 'none' }}>
@@ -325,7 +356,7 @@ const MindMapTool = () => {
 
         if (node.type === 'concept') {
             return (
-                <g {...commonProps}>
+                <g key={node.id} {...commonProps}>
                     <rect x="-50" y="-25" width="100" height="50" rx="8" fill="white" stroke={node.color} strokeWidth="2" />
                     <foreignObject x="-48" y="-22" width="96" height="46" style={{ pointerEvents: 'none' }}>
                         <div style={{
@@ -376,18 +407,18 @@ const MindMapTool = () => {
     if (loading && !mindMapData) return (
         <div className="mm-center-msg">
             <div className="mm-spinner"></div>
-            <p className="text-gray-600 font-medium">Synthesizing Neural Mind Map...</p>
-            <p className="text-gray-400 text-sm mt-2">Analyzing chapter structure</p>
+            <p className="text-gray-600 font-medium">{t.mindmap.generating}</p>
+            <p className="text-gray-400 text-sm mt-2">{t.mindmap.analyzing}</p>
         </div>
     );
 
     if (error) return (
         <div className="mm-center-msg">
             <AlertCircle className="mm-error-icon" />
-            <h2 className="mm-error-title">Generation Failed</h2>
+            <h2 className="mm-error-title">{t.mindmap.failed}</h2>
             <p className="mm-error-text">{error}</p>
             <button onClick={() => navigate(-1)} className="mm-back-home">
-                Go Back
+                {t.dashboard.back}
             </button>
         </div>
     );
@@ -404,7 +435,7 @@ const MindMapTool = () => {
                         <h1>{mindMapData?.title || bookName}</h1>
                         <div className="mm-meta">
                             <span className="mm-tag">{subject}</span>
-                            <span>{mindMapData?.subtopics?.length || 0} Topics</span>
+                            <span>{mindMapData?.subtopics?.length || 0} {t.mindmap.topics}</span>
                         </div>
                     </div>
                 </div>
@@ -416,7 +447,7 @@ const MindMapTool = () => {
                         className="mm-action-btn"
                     >
                         <RefreshCw size={18} className={regenerating ? "mm-spin" : ""} />
-                        <span className="hidden sm:inline">Regenerate</span>
+                        <span className="hidden sm:inline">{t.mindmap.regenerate}</span>
                     </button>
                     <div className="mm-divider"></div>
                     <button onClick={() => { setFocusedSubtopic(null); setZoom(1); setPan({ x: 0, y: 0 }); }} className="mm-icon-btn" title="Reset View">
@@ -432,7 +463,6 @@ const MindMapTool = () => {
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
                 onMouseLeave={handleCanvasMouseUp}
-                onWheel={handleWheel}
             >
                 <svg
                     width="100%"
@@ -462,7 +492,7 @@ const MindMapTool = () => {
 
             {/* Helper Hint */}
             <div className="mm-hint">
-                Double-click subtopic to Expand/Collapse • Click to Focus • Drag to Pan
+                {t.mindmap.hint}
             </div>
         </div>
     );

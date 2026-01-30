@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLanguage } from "../../context/LanguageContext";
+import { translations } from "../../translations";
 import {
     Mic,
     Square,
@@ -22,6 +24,8 @@ import "../../assets/styles/student-dashboard.css";
 const OralTestTool = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { language } = useLanguage();
+    const t = translations[language];
     const { bookId, bookName, subject, studentName, studentClass } = location.state || {};
 
     const [view, setView] = useState('SETUP'); // SETUP, LOADING, TEST, SUMMARY, SUBMITTING
@@ -137,12 +141,16 @@ const OralTestTool = () => {
                     mode,
                     student_name: studentName || localStorage.getItem('studentName') || 'Student',
                     student_class: studentClass || localStorage.getItem('studentClass') || 'Class',
-                    subject
+                    subject,
+                    language: language
                 })
             });
 
             if (!res.ok) throw new Error("Failed to start oral test");
             const data = await res.json();
+            if (!data.questions || data.questions.length === 0) {
+                throw new Error("No questions were generated for this test. Try another chapter.");
+            }
             setQuestions(data.questions);
             setAttemptId(data.attempt_id);
             setView('TEST');
@@ -189,8 +197,8 @@ const OralTestTool = () => {
                             <ChevronLeft size={22} />
                         </button>
                         <div>
-                            <h1 style={{ fontSize: '1.1rem' }}>Oral Test: {bookName}</h1>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{subject} • {mode === 'test' ? 'Test Mode' : 'Practice Mode'}</p>
+                            <h1 style={{ fontSize: '1.1rem' }}>{t.oral.title}: {bookName}</h1>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{subject} • {mode === 'test' ? t.oral.testMode : t.oral.practiceMode}</p>
                         </div>
                     </div>
                 </div>
@@ -206,32 +214,32 @@ const OralTestTool = () => {
                             exit={{ opacity: 0, y: -20 }}
                             className="quiz-card"
                         >
-                            <h2 style={{ marginBottom: '24px' }}>Setup your Oral Test</h2>
+                            <h2 style={{ marginBottom: '24px' }}>{t.oral.setup}</h2>
 
                             <div style={{ marginBottom: '32px' }}>
-                                <p style={{ fontWeight: 600, marginBottom: '12px' }}>Choose Mode:</p>
+                                <p style={{ fontWeight: 600, marginBottom: '12px' }}>{t.oral.chooseMode}:</p>
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                                     <button
                                         onClick={() => setMode('practice')}
                                         className={`quiz-option-btn ${mode === 'practice' ? 'active' : ''}`}
                                         style={{ flex: 1 }}
                                     >
-                                        <div className="label">Practice</div>
-                                        <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>Re-record & Hints</p>
+                                        <div className="label">{t.oral.practice}</div>
+                                        <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>{t.oral.practiceDesc}</p>
                                     </button>
                                     <button
                                         onClick={() => setMode('test')}
                                         className={`quiz-option-btn ${mode === 'test' ? 'active' : ''}`}
                                         style={{ flex: 1 }}
                                     >
-                                        <div className="label">Official Test</div>
-                                        <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>One Take • Teacher Graded</p>
+                                        <div className="label">{t.oral.officialTest}</div>
+                                        <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>{t.oral.officialTestDesc}</p>
                                     </button>
                                 </div>
                             </div>
 
                             <div style={{ marginBottom: '40px' }}>
-                                <p style={{ fontWeight: 600, marginBottom: '12px' }}>Question Count:</p>
+                                <p style={{ fontWeight: 600, marginBottom: '12px' }}>{t.oral.qCount}:</p>
                                 <div className="quiz-options-grid">
                                     {[3, 5, 10].map(count => (
                                         <button
@@ -247,7 +255,7 @@ const OralTestTool = () => {
                             </div>
 
                             <button className="primary-btn" onClick={initializeTest} style={{ width: '100%', height: '56px' }}>
-                                Start Oral Test
+                                {t.oral.start}
                             </button>
                         </motion.div>
                     )}
@@ -255,16 +263,16 @@ const OralTestTool = () => {
                     {view === 'LOADING' && (
                         <motion.div key="loading" className="quiz-loading">
                             <div className="loader-orbit" style={{ margin: '0 auto 24px' }}></div>
-                            <h3>Preparing Oral Test...</h3>
-                            <p>AI is generating academic questions from your textbook.</p>
+                            <h3>{t.oral.preparing}</h3>
+                            <p>{t.oral.preparingDesc}</p>
                         </motion.div>
                     )}
 
                     {view === 'SUBMITTING' && (
                         <motion.div key="submitting" className="quiz-loading">
                             <div className="loader-orbit" style={{ margin: '0 auto 24px' }}></div>
-                            <h3>Finishing Test...</h3>
-                            <p>Saving your responses and notifying your teacher.</p>
+                            <h3>{t.oral.finishing}</h3>
+                            <p>{t.oral.finishingDesc}</p>
                         </motion.div>
                     )}
 
@@ -276,7 +284,7 @@ const OralTestTool = () => {
                             className="oral-test-screen"
                         >
                             <div className="quiz-game-header">
-                                <div className="progress-pill">Question {currentIndex + 1} of {questions.length}</div>
+                                <div className="progress-pill">{t.oral.question} {currentIndex + 1} {t.oral.of} {questions.length}</div>
                                 <div className="timer-pill">
                                     <Clock size={16} /> {formatTime(recordTime)} / {formatTime(MAX_DURATION)}
                                 </div>
@@ -383,7 +391,7 @@ const OralTestTool = () => {
                                     className="primary-btn"
                                     style={{ gap: '8px', padding: '12px 32px' }}
                                 >
-                                    {currentIndex === questions.length - 1 ? 'Finish Oral Test' : 'Next Question'}
+                                    {currentIndex === questions.length - 1 ? t.oral.finishTest : t.oral.nextQuestion}
                                     <ChevronRight size={20} />
                                 </button>
                             </div>
@@ -401,27 +409,27 @@ const OralTestTool = () => {
                             <div style={{ width: '80px', height: '80px', background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                                 <CheckCircle2 size={40} color="#166534" />
                             </div>
-                            <h2>Test Submitted!</h2>
+                            <h2>{t.oral.testSubmitted}</h2>
                             <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>
-                                Your responses have been saved and sent to your teacher for review.<br />
-                                <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600 }}>AI will process a preliminary score within 1-2 minutes.</span>
+                                {t.oral.submittedDesc}<br />
+                                <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600 }}>{t.oral.aiProcessing}</span>
                             </p>
 
                             <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '16px', marginBottom: '32px', textAlign: 'left' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                    <span>Questions Attempted:</span>
+                                    <span>{t.oral.qAttempted}:</span>
                                     <span style={{ fontWeight: 700 }}>{questions.length} / {questions.length}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Status:</span>
+                                    <span>{t.oral.status}:</span>
                                     <span style={{ color: '#b45309', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Clock size={16} /> Awaiting Review
+                                        <Clock size={16} /> {t.oral.awaitingReview}
                                     </span>
                                 </div>
                             </div>
 
                             <button className="primary-btn" onClick={() => navigate('/student/dashboard')} style={{ width: '100%' }}>
-                                Back to Dashboard
+                                {t.dashboard.backToDashboard}
                             </button>
                         </motion.div>
                     )}

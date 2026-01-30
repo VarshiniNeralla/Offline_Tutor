@@ -336,11 +336,16 @@ Constraint: DO NOT REPEAT these ideas: {existing_topics}
   ]
 }}"""
                 
+                # Parameters for retry logic
+                max_retries_per_pass = 3
+                initial_temperature = 0.1
+                current_temp = initial_temperature
+                
                 retry_count = 0
                 questions_added_in_pass = 0
                 while questions_added_in_pass < pass_q_count and retry_count < max_retries_per_pass:
-                    # Use phi3:mini for better T/F quality as per user request
-                    response = self.call_llama_optimized(base_prompt, num_predict=1500, temperature=current_temp, format="json", model="phi3:mini")
+                    # Using dynamically selected model for memory stability
+                    response = self.call_llama_optimized(prompt, num_predict=1500, temperature=current_temp, format="json")
                     
                     try:
                         # Clean response and parse
@@ -392,9 +397,8 @@ Constraint: DO NOT REPEAT these ideas: {existing_topics}
                 if len(all_questions) >= q_count: # Break outer loop if enough questions are generated
                     break
 
-            # 4. Return results
-            final_data = {"questions": all_questions[:q_count]}
-            final_json = json.dumps(final_data)
+            # 4. Return results - Returning JUST THE LIST for frontend consistency
+            final_json = json.dumps(all_questions[:q_count])
             print(f"✅ Got response, mode=truefalse, response length={len(final_json)}")
             return final_json, sources, "truefalse"
             
@@ -442,6 +446,7 @@ Constraint: DO NOT REPEAT these ideas: {existing_topics}
             if response.status_code == 200:
                 models = response.json().get('models', [])
                 model_names = [model['name'] for model in models]
+                self.available_models = model_names # Store all tags for intelligent fallback
                 
                 selected_model = None
                 for candidate in fallback_order:
@@ -790,10 +795,14 @@ and respond in English.
             num_predict = num_predict or config["predict"]
             timeout = timeout or config["timeout"]
         candidates = [self.model_name]
-        if self.model_name == 'mistral':
-            candidates.extend(['phi3', 'phi'])
-        elif self.model_name == 'phi3':
-            candidates.append('phi')
+        # Add fallback small models if available
+        small_models = ['qwen2.5:1.5b', 'llama3.2:1b', 'phi3:mini', 'phi3']
+        if hasattr(self, 'available_models'):
+            for small in small_models:
+                # Check if this exact small model exists in available_models
+                found = next((m for m in self.available_models if small in m), None)
+                if found and found not in candidates:
+                    candidates.append(found)
             
         candidates = list(dict.fromkeys(candidates))
         last_error = ""
@@ -834,6 +843,8 @@ and respond in English.
                     return self.clean_ai_response(response_text)
                 else:
                     last_error = f"Error {response.status_code}"
+                    if response.status_code == 500 and "memory" in response.text.lower():
+                        print(f"🚨 {model} hit Out of Memory. Trying smaller models...")
             
             except requests.exceptions.Timeout:
                 # FALLBACK LOGIC: If Premium/Standard times out, try to return a result from a faster model or mode
@@ -1006,7 +1017,23 @@ JSON OUTPUT:"""
                     print(f"⚠️ Ollama returned empty response for model {self.model_name}")
                 return text
             else:
-                print(f"❌ Ollama Error: {response.status_code} - {response.text}")
+                resp_text = response.text
+                print(f"❌ Ollama Error: {response.status_code} - {resp_text}")
+                
+                # MEMORY SAFETY FALLBACK: If OOM detected, try a smaller model
+                if response.status_code == 500 and "memory" in resp_text.lower():
+                    print("🚨 Out of Memory detected. Attempting to switch to a smaller model...")
+                    smalls = ['llama3.2:1b', 'qwen2.5:1.5b']
+                    for small in smalls:
+                        # Find if small model is available
+                        match = next((name for name in getattr(self, 'available_models', []) if small in name), None)
+                        if match and match != payload["model"]:
+                             print(f"🔄 Retrying with smaller model: {match}")
+                             # Update global model preference for this session to prevent future failures
+                             self.model_name = match 
+                             return self.call_llama_optimized(prompt, num_predict, temperature, format, model=match)
+                    
+                    print("❌ No smaller models found. Please run 'ollama run llama3.2:1b' to add a low-memory model.")
         except Exception as e:
             print(f"❌ call_llama_optimized Exception: {e}")
         return ""
@@ -1732,6 +1759,212 @@ You are an expert oral exam reviewer. Your task is to evaluate a student's spoke
                 "keywords_detected": []
             }
 
+    def generate_one_page_revision_response(self, book_id: str, language: str = 'en'):
+        """
+        Generates a STRICT Single-Page Revision Sheet.
+        Uses Line-Based Parsing Strategy for 1.5B model robustness.
+        """
+        print(f"🧠 Generating One-Page Revision for book_id: {book_id}...")
+        
+        try:
+            # 0. Check VectorStore
+            if not self.vectorstore:
+                print("❌ Vectorstore is None! Embeddings not initialized.")
+                return {"status": "error", "response": "System initializing, please wait."}
+
+            # 1. Retrieve Context
+            # We fetch chunks focusing on the core topic
+            docs = self.vectorstore.similarity_search(
+                f"summary case study important facts definitions impacts for book {book_id}",
+                k=12,
+                filter={"book_id": book_id}
+            )
+            if not docs:
+                return {"status": "error", "response": "No content found for this book."}
+                
+            full_text = "\n".join([d.page_content for d in docs])
+            context = full_text[:5000]
+            
+            # 2. Strict Template Prompt
+            prompt = f"""### SYSTEM:
+You are an expert tutor. Fill out this EXACT Revision Sheet Template for the given text.
+Use the following format (Line-Based). DO NOT skip any section.
+
+LESSON_TITLE: [Chapter Name/Title]
+SOURCE: [Source Material/Book Context]
+IMPORTANT_DATE: [Key Dates or Time Period]
+BACKGROUND:
+- [Background point 1 (Full Sentence)]
+- [Background point 2 (Full Sentence)]
+KEY_INFORMATION:
+- [Fact 1: Must be a full sentence with specific details]
+- [Fact 2: Must be a full sentence with specific details]
+- [Fact 3: Must be a full sentence with specific details]
+EFFECTS:
+- [Effect 1: Consequence (Full Sentence)]
+- [Effect 2: Consequence (Full Sentence)]
+IMPORTANT_TERMS:
+- [Term 1] || [Definition 1]
+- [Term 2] || [Definition 2]
+- [Term 3] || [Definition 3]
+- [Term 4] || [Definition 4]
+- [Term 5] || [Definition 5]
+PRACTICE_QUESTIONS:
+- [Conceptual Question 1 (Start with 'Explain', 'Describe', 'Compare')]
+- [Conceptual Question 2]
+- [Conceptual Question 3]
+- [Conceptual Question 4]
+- [Conceptual Question 5]
+
+Rules:
+1. **DENSITY**: Every bullet point must contain valid information. No empty or vague points.
+2. **NO ACTIVITY QUESTIONS**: NEVER ask to "Leaf through", "Find", "Draw", "Label", "On the map", or "Locate".
+3. **NO TEXTBOOK EXTRAS**: Do not include "Let us do", "Let us draw", "Chapter headers", or "Don't Miss Out" sections.
+4. **NO REPETITION**: Do NOT repeat the same fact in different sections. If you used a fact in 'Background', do NOT repeat it anywhere else.
+4. **FORMAT**: For IMPORTANT_TERMS, you MUST use the separator ' || ' between the term and meaning.
+5. **START IMMEDIATELY** with 'LESSON_TITLE:'.
+6. **CONCEPTUAL ONLY**: All questions must start with 'Why', 'How', 'Explain', 'Compare'.
+
+### CONTEXT:
+{context}
+
+### FILLED TEMPLATE:"""
+
+            # 3. Generation
+            print(f"🧠 Generating Case Study Revision Sheet...")
+            response_text = self.call_llama_optimized(prompt, num_predict=3000, temperature=0.1, format=None)
+            
+            print(f"📄 RAW REVISION OUTPUT:\n{response_text[:500]}...\n-------------------")
+            
+            # 4. Parsing to Strict JSON matching the Template
+            revision_data = {
+                "topic": "Topic",
+                "where": "",
+                "when": "",
+                "why": [],
+                "facts": [],
+                "impacts": [],
+                "keywords": [],
+                "definitions": [],
+                "exam_question": []
+            }
+            
+            current_section = None
+            
+            # Deduplication Helper: Normalize strings to catch almost-identical dupes
+            seen_content = set()
+            
+            def is_duplicate(text):
+                # Normalize: remove non-alphanumeric, lowercase
+                normalized = "".join(c for c in text if c.isalnum()).lower()
+                if normalized in seen_content:
+                    return True
+                seen_content.add(normalized)
+                return False
+
+            for line in response_text.split('\n'):
+                line = line.strip()
+                # Robust cleaning: remove ** and other markers
+                clean_line_check = line.replace("*", "").replace("#", "").strip()
+                
+                if not line: continue
+                
+                # Case and Format Normalization for Headers
+                upper_line = clean_line_check.upper().replace(" ", "_").replace("-", "_")
+                
+                if "LESSON_TITLE" in upper_line:
+                    revision_data["topic"] = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
+                    current_section = None
+                elif "SOURCE" in upper_line or "WHERE" in upper_line:
+                     revision_data["where"] = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
+                     current_section = None
+                elif "IMPORTANT_DATE" in upper_line:
+                    revision_data["when"] = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
+                    current_section = None
+                elif "BACKGROUND" in upper_line:
+                    content = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
+                    if content and not is_duplicate(content): revision_data["why"].append(content)
+                    current_section = "why"
+                elif "KEY_INFORMATION" in upper_line or "FACTS" in upper_line:
+                    content = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
+                    if content and not is_duplicate(content): revision_data["facts"].append(content)
+                    current_section = "facts"
+                elif "EFFECTS" in upper_line or "IMPACTS" in upper_line:
+                    content = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
+                    if content and not is_duplicate(content): revision_data["impacts"].append(content)
+                    current_section = "impacts"
+                elif "IMPORTANT_TERMS" in upper_line or "KEY_DEFS" in upper_line:
+                    current_section = "key_defs"
+                elif "PRACTICE_QUESTIONS" in upper_line or "EXAM_QUESTIONS" in upper_line:
+                     current_section = "exam_question"
+                
+                elif current_section == "key_defs" and (":" in line or "||" in line or " - " in line):
+                    # Clean line (remove bullets if any)
+                    clean_content = line.lstrip("-•1234567890.) ").replace("**", "").strip()
+                    
+                    k, d = None, None
+                    if "||" in clean_content:
+                        parts = clean_content.split("||")
+                        k, d = parts[0].strip(), parts[1].strip()
+                    elif ":" in clean_content:
+                        parts = clean_content.split(":", 1)
+                        k, d = parts[0].strip(), parts[1].strip()
+                    elif " - " in clean_content:
+                         parts = clean_content.split(" - ", 1)
+                         k, d = parts[0].strip(), parts[1].strip()
+                    
+                    if k and d:
+                        if k not in revision_data["keywords"]:
+                             revision_data["keywords"].append(k)
+                             revision_data["definitions"].append(d)
+                
+                # Handle bullet points (generic)
+                elif line.startswith("-") or line.startswith("•") or (line[0].isdigit() and line[1] in ['.', ')']):
+                    content = line.lstrip("-•1234567890.) ").strip()
+                    if current_section and content:
+                        
+
+                        if isinstance(revision_data.get(current_section), list):
+                            # AGGRESSIVE QUESTION FILTERING
+                            if current_section == "exam_question":
+                                # 1. Hard Limit: Max 5 questions
+                                if len(revision_data["exam_question"]) >= 5:
+                                    continue
+
+                                # 2. Bad Start Patterns (Case Insensitive mostly)
+                                bad_starts = [
+                                    "Draw", "Label", "Solve", "Find", "Circle", "On the map", "Locate", 
+                                    "Explain the following terms", "Define the following", "Write short notes",
+                                    "Let us", "**", "Chapter", "Source", "Unit", "Don't Miss Out", "Activity",
+                                    "Then compare"
+                                ]
+                                if any(content.startswith(bad) for bad in bad_starts):
+                                    continue
+                                
+                                # 3. Heuristic: Too long (likely a context dump)
+                                if len(content) > 300:
+                                    continue
+
+                                # 4. Heuristic: Formatting junk
+                                if "pronounced" in content or "See Fig" in content:
+                                    continue
+
+                            if not is_duplicate(content):
+                                revision_data[current_section].append(content)
+
+            # Fallback
+            if not revision_data["facts"] and not revision_data["why"]:
+                 revision_data["why"].append("Could not generate structured data.")
+                 revision_data["why"].append("Please regenerate.")
+
+            return revision_data, [], "revision"
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"❌ Revision Generation Error: {e}")
+            return {"status": "error", "response": f"Server error: {str(e)}"}, [], "revision"
+
     def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None, mode: str = None):
         """SMART response routing with book-level scoping and intent-based optimization."""
         print(f"🧠 Processing question: {question[:50]}...")
@@ -1743,7 +1976,7 @@ You are an expert oral exam reviewer. Your task is to evaluate a student's spoke
             return self.generate_summary_response(question, selected_subjects, selected_books)
         if mode == "keywords":
             return self.generate_keywords_response(question, selected_subjects, selected_books)
-        if mode == "truefalse":
+        if mode == "truefalse" or mode == "true_false":
             return self.generate_true_false_response(question, selected_subjects, selected_books)
         if mode == "flashcards":
             return self.generate_flashcards_response(question, selected_subjects, selected_books)
@@ -1752,6 +1985,9 @@ You are an expert oral exam reviewer. Your task is to evaluate a student's spoke
         if mode == "mindmap":
             book_id = selected_books[0] if selected_books else "unknown"
             return self.generate_mindmap_response(book_id, language=self.language)
+        if mode == "revision":
+            book_id = selected_books[0] if selected_books else "unknown"
+            return self.generate_one_page_revision_response(book_id, language=self.language)
 
         # STEP 1: Detect Intent (Brevity vs Elaboration)
         if not mode:

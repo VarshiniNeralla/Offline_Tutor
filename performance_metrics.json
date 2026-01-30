@@ -201,5 +201,26 @@
     "tokens": 230,
     "time": 42.77,
     "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-01-30 14:21:31",
+    "mode": "true_false",
+    "tokens": 94,
+    "time": 60.9,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-01-30 14:28:43",
+    "mode": "true_false",
+    "tokens": 314,
+    "time": 46.77,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-01-30 16:33:03",
+    "mode": "brief",
+    "tokens": 144,
+    "time": 23.15,
+    "model": "qwen2.5:1.5b"
   }
 ]

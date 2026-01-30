@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useLanguage } from '../context/LanguageContext';
+import { translations } from '../translations';
 import { User, ChevronRight, GraduationCap } from 'lucide-react';
 
 const StudentAuth = () => {
     const navigate = useNavigate();
+    const { language } = useLanguage();
+    const t = translations[language];
     const [name, setName] = useState('');
     const [selectedClass, setSelectedClass] = useState('Class 10');
 
@@ -23,10 +27,13 @@ const StudentAuth = () => {
         navigate('/student/dashboard');
     };
 
-    const classes = [
-        "Class 6", "Class 7", "Class 8", "Class 9",
-        "Class 10", "Class 11", "Class 12"
-    ];
+    const classes = ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
+
+    const getClassDisplay = (cls) => {
+        if (language === 'english') return cls;
+        const num = cls.match(/\d+/);
+        return num ? `తరగతి ${num[0]}` : cls;
+    };
 
     return (
         <div className="student-auth-root">
@@ -43,18 +50,18 @@ const StudentAuth = () => {
                     <div className="student-auth-icon">
                         <GraduationCap size={32} />
                     </div>
-                    <h1>Welcome Student</h1>
-                    <p>Setup your profile to start learning</p>
+                    <h1>{t.auth.welcome}</h1>
+                    <p>{t.auth.setupProfile}</p>
                 </div>
 
                 <div className="student-auth-form">
                     <div className="student-field">
-                        <label>Your Name</label>
+                        <label>{t.auth.yourName}</label>
                         <div className="student-input">
                             <User size={18} />
                             <input
                                 type="text"
-                                placeholder="Enter your full name"
+                                placeholder={t.auth.placeholderName}
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
@@ -63,7 +70,7 @@ const StudentAuth = () => {
                     </div>
 
                     <div className="student-field">
-                        <label>Select Your Class</label>
+                        <label>{t.auth.selectClass}</label>
                         <div className="student-class-grid">
                             {classes.map(cls => (
                                 <button
@@ -71,7 +78,7 @@ const StudentAuth = () => {
                                     onClick={() => setSelectedClass(cls)}
                                     className={`class-pill ${selectedClass === cls ? 'active' : ''}`}
                                 >
-                                    {cls}
+                                    {getClassDisplay(cls)}
                                 </button>
                             ))}
                         </div>
@@ -82,12 +89,12 @@ const StudentAuth = () => {
                         disabled={!name.trim()}
                         className="student-auth-btn"
                     >
-                        Start Studying <ChevronRight size={20} />
+                        {t.auth.startStudying} <ChevronRight size={20} />
                     </button>
                 </div>
 
                 <div className="student-auth-footer">
-                    Fully offline • Privacy focused
+                    {t.auth.footer}
                 </div>
             </motion.div>
         </div>

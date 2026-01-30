@@ -103,6 +103,7 @@ class OralTestStartRequest(BaseModel):
     student_name: str
     student_class: str
     subject: str
+    language: str
 
 class OralReviewRequest(BaseModel):
     attempt_id: str
@@ -267,6 +268,14 @@ async def start_oral_test(request: OralTestStartRequest):
         raise HTTPException(status_code=503, detail="System initializing")
         
     try:
+        # Switch language if needed
+        if tutor_backend.language != request.language:
+            print(f"🔄 Switching language for Oral Test to {request.language}")
+            tutor_backend.language = request.language
+            if request.language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
+                 tutor_backend.setup_telugu_asr_offline()
+            tutor_backend.setup_offline_tts()
+
         # 1. Generate Questions
         prompt = f"Generate {request.q_count} oral test questions for {request.book_name}"
         questions, _, _ = tutor_backend.generate_oral_test_response(

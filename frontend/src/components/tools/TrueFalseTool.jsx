@@ -21,11 +21,15 @@ import {
     Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLanguage } from '../../context/LanguageContext';
+import { translations } from '../../translations';
 import '../../assets/styles/student-dashboard.css';
 
 const TrueFalseTool = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { language } = useLanguage();
+    const t = translations[language];
 
     // Context from Dashboard / Admin
     const { subject, bookId, bookName: rawBookName, class: className, role = 'student' } = location.state || {};
@@ -100,114 +104,78 @@ const TrueFalseTool = () => {
                 }
             }
 
-            // Fetch from Backend
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: `Identify ${qCount} important facts, numerical data, and core concepts from this text to generate True/False questions.`,
+                    message: `Generate ${qCount} true or false questions for the textbook "${bookName}".`,
                     subjects: [subject],
                     book_ids: [bookId],
-                    language: 'english',
-                    mode: 'truefalse'
+                    language: language,
+                    mode: 'true_false'
                 })
             });
 
-            if (!res.ok) throw new Error("Failed to contact AI.");
+            if (!res.ok) throw new Error("Request failed");
             const data = await res.json();
 
-            let extracted = [];
-            if (data.response && data.response.trim().startsWith('{')) {
-                const parsedJson = JSON.parse(data.response);
-                if (parsedJson.questions) {
-                    extracted = parsedJson.questions;
+            if (data.mode === 'true_false' || data.mode === 'truefalse') {
+                let responseStr = data.response;
+                let parsed;
+
+                try {
+                    // Attempt direct parse first
+                    parsed = typeof responseStr === 'string' ? JSON.parse(responseStr) : responseStr;
+                } catch (e) {
+                    // If it fails, try to extract the JSON array [ ... ]
+                    const match = responseStr.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        try {
+                            parsed = JSON.parse(match[0]);
+                        } catch (e2) {
+                            throw new Error("Failed to extract valid JSON array.");
+                        }
+                    } else {
+                        throw new Error("No JSON array found in response.");
+                    }
                 }
+
+                if (!parsed || !Array.isArray(parsed) || parsed.length === 0) {
+                    throw new Error("No questions were generated for this content. Please try a different textbook or count.");
+                }
+
+                setQuestions(parsed);
+                localStorage.setItem(cacheKey, JSON.stringify({ data: parsed, timestamp: Date.now() }));
+                setView('GAME');
+            } else {
+                throw new Error("Invalid response format");
             }
-
-            if (extracted.length === 0) {
-                throw new Error("The AI was unable to extract factual questions from this section. Please try again or select a different chapter.");
-            }
-
-            setQuestions(extracted);
-            // Cache it
-            localStorage.setItem(cacheKey, JSON.stringify({
-                version: 1,
-                type: 'ai',
-                timestamp: Date.now(),
-                is_active: true,
-                data: extracted
-            }));
-            setView('GAME');
-
         } catch (err) {
-            console.error(err);
-            setErrorMsg(err.message || "Could not load questions.");
+            console.error("TF Gen Error:", err);
+            setErrorMsg(err.message.includes("Unexpected token") ? "AI returned malformed data." : err.message);
             setView('ERROR');
         }
     };
 
-    const handleAnswer = (qIdx, choice) => {
-        if (view === 'RESULTS') return;
-
-        const newAnswers = { ...userAnswers, [qIdx]: choice };
-        setUserAnswers(newAnswers);
-
+    const handleAnswer = (idx, ans) => {
+        if (userAnswers[idx] !== undefined && mode === 'PRACTICE') return;
+        setUserAnswers(prev => ({ ...prev, [idx]: ans }));
         if (mode === 'PRACTICE') {
-            setShowExplanations({ ...showExplanations, [qIdx]: true });
-        }
-    };
-
-    const saveProgress = async (finalQuestions, finalAnswers) => {
-        try {
-            const studentName = localStorage.getItem("studentName");
-            const studentClass = localStorage.getItem("studentClass");
-
-            let correctCount = 0;
-            const limit = Math.min(qCount, finalQuestions.length);
-            const detailedQuestions = finalQuestions.slice(0, limit).map((q, idx) => {
-                const userAns = finalAnswers[idx];
-                const isCorrect = userAns === q.answer;
-                if (isCorrect) correctCount++;
-                return {
-                    ...q,
-                    user_answer: userAns,
-                    correct_answer: q.answer
-                };
-            });
-
-            const payload = {
-                type: 'truefalse',
-                student_name: studentName,
-                student_class: studentClass,
-                subject,
-                book_id: bookId,
-                book_name: bookName,
-                score: correctCount,
-                total_questions: detailedQuestions.length,
-                questions: detailedQuestions
-            };
-
-            await fetch('/api/progress/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch (err) {
-            console.error("Save progress failed", err);
+            setShowExplanations(prev => ({ ...prev, [idx]: true }));
         }
     };
 
     const calculateResults = () => {
-        let finalScore = 0;
-        questions.forEach((q, idx) => {
-            if (userAnswers[idx] === q.answer) finalScore++;
+        let s = 0;
+        questions.slice(0, qCount).forEach((q, i) => {
+            if (userAnswers[i] === q.answer) s++;
         });
-        setScore(finalScore);
+        setScore(s);
         setView('RESULTS');
-        saveProgress(questions, userAnswers);
     };
 
     const handleRetry = () => {
+        localStorage.removeItem(`tf_active_session_${bookId}`);
         setUserAnswers({});
         setShowExplanations({});
         setScore(0);
@@ -215,87 +183,58 @@ const TrueFalseTool = () => {
         setView('SETUP');
     };
 
-    // Teacher Logic
-    const handleEditChange = (idx, field, value) => {
-        const newData = [...questions];
-        newData[idx][field] = value;
-        newData[idx].editedByTeacher = true;
-        setQuestions(newData);
+    const handleEditChange = (index, field, value) => {
+        const newQs = [...questions];
+        newQs[index] = { ...newQs[index], [field]: value, editedByTeacher: true };
+        setQuestions(newQs);
         setUnsavedChanges(true);
     };
 
-    const handleSave = () => {
-        const cacheKey = `tf_history_${bookId}_v1`;
-        localStorage.setItem(cacheKey, JSON.stringify({
-            version: Date.now(),
-            type: 'teacher',
-            timestamp: Date.now(),
-            is_active: true,
-            data: questions
-        }));
+    const saveChanges = () => {
+        const cacheKey = `tf_history_${bookId}_${qCount}_v1`;
+        localStorage.setItem(cacheKey, JSON.stringify({ data: questions, timestamp: Date.now() }));
         setUnsavedChanges(false);
         setIsEditing(false);
-        alert("Changes saved successfully!");
-    };
-
-    const handleAddQuestion = () => {
-        const newQ = {
-            statement: "New statement...",
-            answer: true,
-            explanation: "Brief explanation...",
-            difficulty: "Easy",
-            section_reference: "General",
-            corrected_statement: "",
-            editedByTeacher: true
-        };
-        setQuestions([newQ, ...questions]);
-        setUnsavedChanges(true);
     };
 
     const handleDelete = (index) => {
-        if (window.confirm("Remove this question?")) {
-            const newData = questions.filter((_, i) => i !== index);
-            setQuestions(newData);
-            setUnsavedChanges(true);
-        }
+        if (!window.confirm("Delete this question?")) return;
+        const newQs = questions.filter((_, i) => i !== index);
+        setQuestions(newQs);
+        setUnsavedChanges(true);
     };
 
-    // --- RENDER ---
     return (
         <div className="dashboard-root" style={{ minHeight: '100vh', background: '#f8fafc' }}>
             <header className="dashboard-header">
-                <div className="dashboard-header-inner" style={{ justifyContent: 'space-between' }}>
+                <div className="dashboard-header-inner">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => navigate(role === 'teacher' ? '/teacher' : '/student/dashboard')} className="back-icon-btn">
+                        <button
+                            className="back-icon-btn"
+                            onClick={() => navigate(role === 'teacher' ? '/teacher' : '/student/dashboard')}
+                        >
                             <ChevronLeft size={22} />
                         </button>
                         <div>
-                            <h1 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>True/False Quiz: {bookName}</h1>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{subject} • {role === 'teacher' ? 'Management Mode' : 'Practice & Mastery'}</p>
+                            <h1 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>{t.tools.items.trueFalse}</h1>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{bookName}</p>
                         </div>
                     </div>
 
-                    {view === 'GAME' && (
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            {role === 'teacher' ? (
-                                isEditing ? (
-                                    <>
-                                        <button className="secondary-btn" onClick={() => setIsEditing(false)} style={{ padding: '8px 16px', borderRadius: '8px' }}>Cancel</button>
-                                        <button className="secondary-btn" onClick={handleAddQuestion} style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center', background: '#ecfdf5', color: '#059669', borderColor: '#10b981' }}>
-                                            <Plus size={18} /> Add Question
-                                        </button>
-                                        <button className="primary-btn" onClick={handleSave} disabled={!unsavedChanges} style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                            <Save size={18} /> Save Batch
-                                        </button>
-                                    </>
-                                ) : (
-                                    <button className="secondary-btn" onClick={() => setIsEditing(true)} style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                        <Edit3 size={18} /> Edit Questions
+                    {role === 'teacher' && view === 'GAME' && (
+                        <div className="header-actions">
+                            {isEditing ? (
+                                <>
+                                    <button className="btn-primary" onClick={saveChanges} disabled={!unsavedChanges} style={{ gap: '8px', background: '#10b981' }}>
+                                        <Save size={18} /> Save
                                     </button>
-                                )
+                                    <button className="btn-secondary" onClick={() => { setIsEditing(false); setUnsavedChanges(false); }} style={{ gap: '8px' }}>
+                                        <RotateCcw size={18} /> Cancel
+                                    </button>
+                                </>
                             ) : (
-                                <button className="secondary-btn" onClick={handleRetry} style={{ padding: '8px 16px', color: '#ef4444', borderColor: '#fee2e2' }}>
-                                    End Quiz
+                                <button className="btn-secondary" onClick={() => setIsEditing(true)} style={{ gap: '8px' }}>
+                                    <Edit3 size={18} /> Edit Questions
                                 </button>
                             )}
                         </div>
@@ -303,99 +242,64 @@ const TrueFalseTool = () => {
                 </div>
             </header>
 
-            <main className="dashboard-container" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '60px' }}>
+            <main className="dashboard-container" style={{ padding: '32px 20px', maxWidth: '800px', margin: '0 auto' }}>
                 <AnimatePresence mode="wait">
                     {view === 'SETUP' && (
-                        <motion.div key="setup" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-card" style={{ padding: '28px', textAlign: 'left', border: '1px solid #e0e7ff', maxWidth: '500px', margin: '75px auto 0', boxShadow: '0 20px 40px -10px rgba(99, 102, 241, 0.15)', borderRadius: '24px' }}>
-                            {/* Vibrant Header */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                    <div style={{ padding: '10px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: '14px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)' }}>
-                                        <Target size={22} color="white" />
-                                    </div>
-                                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, background: 'linear-gradient(90deg, #1e293b, #4f46e5)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                                        True/False
-                                    </h2>
-                                </div>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4f46e5', background: '#e0e7ff', padding: '6px 12px', borderRadius: '20px', letterSpacing: '0.5px' }}>
-                                    {bookName}
-                                </span>
+                        <motion.div key="setup" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="glass-card" style={{ padding: '40px', textAlign: 'center', marginTop: '5rem' }}>
+                            <div style={{ width: '80px', height: '80px', background: 'var(--primary-soft)', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', color: 'var(--primary)' }}>
+                                <Target size={40} />
                             </div>
+                            <h2 style={{ fontSize: '1.75rem', marginBottom: '8px' }}>Truth Seeker Mission</h2>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '40px' }}>Identify the true facts from the misinformation in "{bookName}".</p>
 
-                            {/* Pill Grid Controls */}
-                            <div style={{ display: 'grid', gap: '24px', marginBottom: '32px' }}>
-                                {/* Row 1: Question Count */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', textAlign: 'left', marginBottom: '40px' }}>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>Mission Length</label>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        {t.tf.missionLength}
+                                    </label>
                                     <div style={{ display: 'flex', gap: '8px' }}>
-                                        {[5, 10, 15].map(n => (
+                                        {[5, 10, 15, 20].map(n => (
                                             <button
                                                 key={n}
+                                                className={`count-btn ${qCount === n ? 'active' : ''}`}
                                                 onClick={() => setQCount(n)}
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '10px',
-                                                    borderRadius: '50px', // Pill Shape
-                                                    border: 'none',
-                                                    background: qCount === n ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : '#f1f5f9',
-                                                    color: qCount === n ? 'white' : '#64748b',
-                                                    fontWeight: 700,
-                                                    fontSize: '0.95rem',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                                    boxShadow: qCount === n ? '0 8px 16px -4px rgba(99, 102, 241, 0.4)' : 'none',
-                                                    transform: qCount === n ? 'scale(1.05)' : 'scale(1)'
-                                                }}
+                                                style={{ flex: 1 }}
                                             >
                                                 {n}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-
-                                {/* Row 2: Mode */}
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>Difficulty</label>
-                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        {t.tf.difficulty}
+                                    </label>
+                                    <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
                                         <button
+                                            className="mode-toggle"
                                             onClick={() => setMode('PRACTICE')}
                                             style={{
-                                                flex: 1,
-                                                padding: '10px',
-                                                borderRadius: '50px',
-                                                border: 'none',
-                                                background: mode === 'PRACTICE' ? 'linear-gradient(135deg, #10b981, #059669)' : '#f1f5f9',
-                                                color: mode === 'PRACTICE' ? 'white' : '#64748b',
-                                                fontWeight: 700,
-                                                fontSize: '0.95rem',
-                                                cursor: 'pointer',
-                                                display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center',
-                                                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                                boxShadow: mode === 'PRACTICE' ? '0 8px 16px -4px rgba(16, 185, 129, 0.4)' : 'none',
-                                                transform: mode === 'PRACTICE' ? 'scale(1.05)' : 'scale(1)'
+                                                flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                                                background: mode === 'PRACTICE' ? 'white' : 'transparent',
+                                                boxShadow: mode === 'PRACTICE' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                                                fontWeight: 700, fontSize: '0.85rem', color: mode === 'PRACTICE' ? 'var(--primary)' : '#64748b',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                                             }}
                                         >
-                                            <BookOpen size={16} /> Practice
+                                            <Brain size={16} /> {t.tf.practice}
                                         </button>
                                         <button
+                                            className="mode-toggle"
                                             onClick={() => setMode('TEST')}
                                             style={{
-                                                flex: 1,
-                                                padding: '10px',
-                                                borderRadius: '50px',
-                                                border: 'none',
-                                                background: mode === 'TEST' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '#f1f5f9',
-                                                color: mode === 'TEST' ? 'white' : '#64748b',
-                                                fontWeight: 700,
-                                                fontSize: '0.95rem',
-                                                cursor: 'pointer',
-                                                display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center',
-                                                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                                boxShadow: mode === 'TEST' ? '0 8px 16px -4px rgba(245, 158, 11, 0.4)' : 'none',
-                                                transform: mode === 'TEST' ? 'scale(1.05)' : 'scale(1)'
+                                                flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                                                background: mode === 'TEST' ? 'white' : 'transparent',
+                                                boxShadow: mode === 'TEST' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                                                fontWeight: 700, fontSize: '0.85rem', color: mode === 'TEST' ? 'var(--primary)' : '#64748b',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                                             }}
                                         >
-                                            <Trophy size={16} /> Test
+                                            <Trophy size={16} /> {t.tf.test}
                                         </button>
                                     </div>
                                 </div>
@@ -425,7 +329,7 @@ const TrueFalseTool = () => {
                                 onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
                                 onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
                             >
-                                Start Mission 🚀
+                                {t.tf.startMission} 🚀
                             </button>
                         </motion.div>
                     )}
@@ -435,8 +339,8 @@ const TrueFalseTool = () => {
                             <div className="spinner-large" style={{ margin: '0 auto 24px' }}>
                                 <Brain size={48} className="zap-spin" style={{ color: 'var(--primary)' }} />
                             </div>
-                            <h3>Analyzing Textbook...</h3>
-                            <p>Crafting direct factual questions</p>
+                            <h3>{t.tf.analyzing}</h3>
+                            <p>{t.tf.crafting}</p>
                         </motion.div>
                     )}
 
@@ -457,14 +361,14 @@ const TrueFalseTool = () => {
                             {/* Pagination Progress */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <BookOpen size={16} /> PAGE {currentBatch + 1} OF {Math.ceil(questions.slice(0, qCount).length / 5)}
+                                    <BookOpen size={16} /> {t.tf.page} {currentBatch + 1} {t.tf.of} {Math.max(1, Math.ceil(questions.slice(0, qCount).length / 5))}
                                 </div>
                                 <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '10px', width: '200px', overflow: 'hidden', position: 'relative' }}>
                                     <motion.div
                                         initial={{ width: 0 }}
-                                        animate={{ width: `${(Object.keys(userAnswers).length / Math.min(qCount, questions.length)) * 100}%` }}
+                                        animate={{ width: `${(questions.length > 0) ? (Object.keys(userAnswers).length / Math.min(qCount, questions.length)) * 100 : 0}%` }}
                                         className="mastery-bar-glow"
-                                        style={{ height: '100%', background: 'linear-gradient(90deg, #6366f1, #a855f7)', transition: 'width 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}
+                                        style={{ height: '100%', background: 'linear-gradient(90deg, #6366f1, #a855f7)' }}
                                     />
                                 </div>
                             </div>
@@ -497,7 +401,7 @@ const TrueFalseTool = () => {
                                     className="secondary-btn"
                                     style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '10px 20px' }}
                                 >
-                                    <ChevronLeft size={20} /> Previous
+                                    <ChevronLeft size={20} /> {t.tf.previous}
                                 </button>
 
                                 {(currentBatch + 1) * 5 < Math.min(qCount, questions.length) ? (
@@ -506,7 +410,7 @@ const TrueFalseTool = () => {
                                         className="secondary-btn"
                                         style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '10px 20px' }}
                                     >
-                                        Next <ChevronRight size={20} />
+                                        {t.tf.next} <ChevronRight size={20} />
                                     </button>
                                 ) : (
                                     <button
@@ -515,7 +419,7 @@ const TrueFalseTool = () => {
                                         style={{ padding: '10px 30px' }}
                                         disabled={Object.keys(userAnswers).length < Math.min(qCount, questions.length)}
                                     >
-                                        Finish & Review
+                                        {t.tf.finishReview}
                                     </button>
                                 )}
                             </div>
@@ -525,19 +429,19 @@ const TrueFalseTool = () => {
                     {view === 'RESULTS' && (
                         <motion.div key="results" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card" style={{ padding: '40px', textAlign: 'center' }}>
                             <Trophy size={64} color="#f59e0b" style={{ marginBottom: '20px' }} />
-                            <h2>Quiz Complete!</h2>
+                            <h2>{t.quiz.complete}</h2>
                             <div style={{ fontSize: '3rem', fontWeight: 800, margin: '16px 0', color: 'var(--primary)' }}>
                                 {score} / {Math.min(qCount, questions.length)}
                             </div>
                             <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>
-                                {score / Math.min(qCount, questions.length) > 0.8 ? "Excellent! You've mastered these facts." : "Good effort! Review the explanations to improve."}
+                                {score / Math.min(qCount, questions.length) > 0.8 ? t.quiz.excellent : t.quiz.keepTrying}
                             </p>
 
                             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
                                 <button onClick={handleRetry} className="secondary-btn" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <RotateCcw size={18} /> New Quiz
+                                    <RotateCcw size={18} /> {t.quiz.retry}
                                 </button>
-                                <button onClick={() => setView('GAME')} className="primary-btn">Review Answers</button>
+                                <button onClick={() => setView('GAME')} className="primary-btn">{t.quiz.reviewAnswers}</button>
                             </div>
                         </motion.div>
                     )}
@@ -614,11 +518,13 @@ const TrueFalseTool = () => {
                     box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 
 const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, onEdit, onDelete, testMode }) => {
+    const { language } = useLanguage();
+    const t = translations[language];
     const isCorrect = answer === question.answer;
 
     return (
@@ -634,7 +540,7 @@ const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, o
             {/* Verification Badge */}
             {!isEditing && question.editedByTeacher && (
                 <div style={{ position: 'absolute', top: '12px', right: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', fontWeight: 800, background: '#f0fdf4', padding: '4px 8px', borderRadius: '100px' }}>
-                    <ShieldCheck size={12} /> VERIFIED
+                    <ShieldCheck size={12} /> {t.tf.verified.toUpperCase()}
                 </div>
             )}
 
@@ -659,9 +565,9 @@ const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, o
                                 style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontInherit: 'inherit', resize: 'none' }}
                             />
                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)' }}>KEY RESPONSE:</label>
-                                <button onClick={() => onEdit(index, 'answer', true)} className={`pill-btn ${question.answer ? 'active-true' : ''}`} style={{ padding: '6px 16px' }}>True</button>
-                                <button onClick={() => onEdit(index, 'answer', false)} className={`pill-btn ${!question.answer ? 'active-false' : ''}`} style={{ padding: '6px 16px' }}>False</button>
+                                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t.tf.keyResponse.toUpperCase()}:</label>
+                                <button onClick={() => onEdit(index, 'answer', true)} className={`pill-btn ${question.answer ? 'active-true' : ''}`} style={{ padding: '6px 16px' }}>{t.tf.true}</button>
+                                <button onClick={() => onEdit(index, 'answer', false)} className={`pill-btn ${!question.answer ? 'active-false' : ''}`} style={{ padding: '6px 16px' }}>{t.tf.false}</button>
                             </div>
                         </div>
                     ) : (
@@ -676,7 +582,7 @@ const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, o
                                 className={`pill-btn ${answer === true ? (testMode ? 'active-true' : (question.answer ? 'active-true' : 'active-false')) : ''}`}
                                 style={{ flex: 1 }}
                             >
-                                {answer === true && <CheckCircle2 size={18} />} True
+                                {answer === true && <CheckCircle2 size={18} />} {t.tf.true}
                             </button>
                             <button
                                 onClick={() => onAnswer(index, false)}
@@ -684,17 +590,8 @@ const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, o
                                 className={`pill-btn ${answer === false ? (testMode ? '' : (question.answer === false ? 'active-true' : 'active-false')) : (answer === false ? 'active-false' : '')}`}
                                 style={{ flex: 1 }}
                             >
-                                {answer === false && <XCircle size={18} />} False
+                                {answer === false && <XCircle size={18} />} {t.tf.false}
                             </button>
-                            {/* Adjusted the logic above slightly to handle "active-true" vs "active-false" correctly for immediate feedback in practice mode */}
-                            {/* Let's simplify and make it correct: */}
-                            {/*
-                              Practice Mode:
-                                If answer selected is True:
-                                  Is question.answer True? active-true. Else active-false.
-                              Test Mode:
-                                Just active color (primary).
-                            */}
                         </div>
                     )}
 
@@ -703,13 +600,13 @@ const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, o
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                                 {isCorrect ? <CheckCircle2 size={18} color="#10b981" /> : <XCircle size={18} color="#f43f5e" />}
                                 <span style={{ fontWeight: 800, color: isCorrect ? '#10b981' : '#f43f5e', textTransform: 'uppercase', fontSize: '0.8rem', letterSpacing: '0.05em' }}>
-                                    {isCorrect ? 'Stellar!' : 'Not Quite'}
+                                    {isCorrect ? t.tf.stellar : t.tf.notQuite}
                                 </span>
                             </div>
 
                             {!question.answer && question.corrected_statement && (
                                 <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '12px', borderRadius: '12px', fontSize: '0.9rem', borderLeft: '4px solid #10b981', marginBottom: '12px', color: '#065f46' }}>
-                                    <strong style={{ fontWeight: 800 }}>FACT:</strong> {question.corrected_statement}
+                                    <strong style={{ fontWeight: 800 }}>{t.tf.fact.toUpperCase()}:</strong> {question.corrected_statement}
                                 </div>
                             )}
 
@@ -722,7 +619,7 @@ const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, o
                     {isEditing && (
                         <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                             <div style={{ flex: '1 1 300px' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>WHY IS THIS TRUE/FALSE?</label>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>{t.quiz.explanation.toUpperCase()}?</label>
                                 <textarea
                                     value={question.explanation}
                                     onChange={(e) => onEdit(index, 'explanation', e.target.value)}
@@ -731,7 +628,7 @@ const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, o
                             </div>
                             {!question.answer && (
                                 <div style={{ flex: '1 1 300px' }}>
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>CORRECTION (IF FALSE)</label>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>{t.tf.fact.toUpperCase()} (IF FALSE)</label>
                                     <textarea
                                         value={question.corrected_statement}
                                         onChange={(e) => onEdit(index, 'corrected_statement', e.target.value)}
@@ -740,7 +637,7 @@ const QuestionRow = ({ index, question, isEditing, answer, showExpl, onAnswer, o
                                 </div>
                             )}
                             <button onClick={() => onDelete(index)} style={{ padding: '8px', color: '#f43f5e', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 700 }}>
-                                <Trash2 size={16} /> Delete
+                                <Trash2 size={16} /> {t.tf.delete}
                             </button>
                         </div>
                     )}

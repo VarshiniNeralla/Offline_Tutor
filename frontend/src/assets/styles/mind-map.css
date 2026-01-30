@@ -220,14 +220,16 @@
 .mm-error-icon {
     width: 64px;
     height: 64px;
-    color: #ef4444; /* red-500 */
+    color: #ef4444;
+    /* red-500 */
     margin-bottom: 16px;
 }
 
 .mm-error-title {
     font-size: 1.25rem;
     font-weight: 700;
-    color: #b91c1c; /* red-700 */
+    color: #b91c1c;
+    /* red-700 */
     margin-bottom: 8px;
 }
 
@@ -252,9 +254,48 @@
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .mm-spin {
     animation: spin 1s linear infinite;
+}
+
+/* -------------------------------- */
+/* RESPONSIVE */
+/* -------------------------------- */
+
+@media (max-width: 600px) {
+    .mindmap-header {
+        padding: 0 12px;
+        height: 56px;
+    }
+
+    .mm-title h1 {
+        font-size: 1rem;
+        max-width: 150px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mm-meta span:not(.mm-tag) {
+        display: none;
+    }
+
+    .mm-action-btn span {
+        display: none;
+    }
+
+    .mm-hint {
+        display: none;
+        /* Too cluttered on mobile */
+    }
+
+    .mm-footer {
+        bottom: 16px;
+        right: 16px;
+    }
 }

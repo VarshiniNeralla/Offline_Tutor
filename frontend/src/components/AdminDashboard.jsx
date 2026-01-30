@@ -22,9 +22,11 @@ import {
     ChevronRight,
     Star,
     CheckCircle2,
-    Zap
+    Zap,
+    Languages
 } from "lucide-react";
-
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations";
 import "../assets/styles/admin-dashboard.css";
 
 const CLASSES = [
@@ -34,6 +36,15 @@ const CLASSES = [
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
+    const { language, toggleLanguage } = useLanguage();
+    const t = translations[language];
+
+    const getClassDisplay = (cls) => {
+        if (language === 'english') return cls;
+        if (cls === "Unassigned") return "కేటాయించబడలేదు";
+        const num = cls.match(/\d+/);
+        return num ? `తరగతి ${num[0]}` : cls;
+    };
 
     // Data State
     const [books, setBooks] = useState({}); // Raw dictionary: { id: bookObj }
@@ -71,23 +82,23 @@ const AdminDashboard = () => {
     const getSummaryStatus = (bookId) => {
         const key = `summary_history_${bookId}_v2`;
         const data = localStorage.getItem(key);
-        if (!data) return { label: "Generate AI Summary", color: "var(--primary)", dot: false };
+        if (!data) return { label: t.teacher.generateSummary, color: "var(--primary)", dot: false };
 
         try {
             const history = JSON.parse(data);
-            if (!history || history.length === 0) return { label: "Generate AI Summary", color: "var(--primary)", dot: false };
+            if (!history || history.length === 0) return { label: t.teacher.generateSummary, color: "var(--primary)", dot: false };
 
             // Check for teacher version
             const hasTeacher = history.some(h => h.type === 'teacher' && !h.deleted_at);
-            if (hasTeacher) return { label: "View Summary", color: "#059669", dot: false }; // Green
+            if (hasTeacher) return { label: t.teacher.viewSummary, color: "#059669", dot: false }; // Green
 
             // Check for student version
             const hasStudent = history.some(h => h.type === 'student' && !h.deleted_at);
-            if (hasStudent) return { label: "Review Student Draft", color: "#d97706", dot: true }; // Orange + Dot
+            if (hasStudent) return { label: t.teacher.reviewDraft, color: "#d97706", dot: true }; // Orange + Dot
 
-            return { label: "Manage Summary", color: "var(--primary)", dot: false };
+            return { label: t.teacher.manageSummary, color: "var(--primary)", dot: false };
         } catch {
-            return { label: "Generate AI Summary", color: "var(--primary)", dot: false };
+            return { label: t.teacher.generateSummary, color: "var(--primary)", dot: false };
         }
     };
 
@@ -188,7 +199,7 @@ const AdminDashboard = () => {
     };
 
     const handleDelete = async (bookId, bookName) => {
-        if (!window.confirm(`Delete "${bookName}"? This cannot be undone.`)) return;
+        if (!window.confirm(t.teacher.deleteConfirm.replace("{name}", bookName))) return;
         await fetch(`/api/textbook/${bookId}`, { method: "DELETE" });
         fetchTextbooks();
     };
@@ -258,11 +269,11 @@ const AdminDashboard = () => {
     // --- Render Helpers ---
     const renderBreadcrumbs = () => (
         <div className="breadcrumbs">
-            <span className={viewMode === "CLASSES" ? "active" : ""} onClick={() => { setActiveClass(""); setActiveSubject(""); setViewMode("CLASSES") }}>Library</span>
+            <span className={viewMode === "CLASSES" ? "active" : ""} onClick={() => { setActiveClass(""); setActiveSubject(""); setViewMode("CLASSES") }}>{t.teacher.library}</span>
             {activeClass && (
                 <>
                     <span className="sep">/</span>
-                    <span className={viewMode === "SUBJECTS" ? "active" : ""} onClick={() => { setActiveSubject(""); setViewMode("SUBJECTS") }}>{activeClass}</span>
+                    <span className={viewMode === "SUBJECTS" ? "active" : ""} onClick={() => { setActiveSubject(""); setViewMode("SUBJECTS") }}>{getClassDisplay(activeClass)}</span>
                 </>
             )}
             {activeSubject && (
@@ -284,13 +295,19 @@ const AdminDashboard = () => {
                             <GraduationCap size={22} />
                         </div>
                         <div>
-                            <h1>Teacher Library</h1>
-                            <p>Manage textbooks and study materials</p>
+                            <h1>{t.teacher.title}</h1>
+                            <p>{t.teacher.subtitle}</p>
                         </div>
                     </div>
-                    <button className="back-btn" onClick={handleBack}>
-                        <ChevronLeft size={16} /> Back
-                    </button>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <button className="lang-toggle-btn" onClick={toggleLanguage} title={language === 'english' ? 'Telugu లోకి మారండి' : 'Switch to English'}>
+                            <Languages size={18} />
+                            <span>{language === 'english' ? 'తెలుగు' : 'English'}</span>
+                        </button>
+                        <button className="back-btn" onClick={handleBack}>
+                            <ChevronLeft size={16} /> {t.teacher.back}
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -304,7 +321,7 @@ const AdminDashboard = () => {
                             onClick={() => setViewMode("ORAL_REVIEW")}
                             style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}
                         >
-                            <Mic size={18} /> Review Oral Tests
+                            <Mic size={18} /> {t.teacher.reviewOral}
                             {pendingOralTests.length > 0 && (
                                 <span style={{
                                     position: 'absolute', top: '-5px', right: '-5px',
@@ -317,7 +334,7 @@ const AdminDashboard = () => {
                             )}
                         </button>
                         <button className="btn-primary" onClick={openUploadModal}>
-                            <FolderPlus size={18} /> Upload Materials
+                            <FolderPlus size={18} /> {t.teacher.uploadMaterials}
                         </button>
                     </div>
                 </div>
@@ -336,8 +353,8 @@ const AdminDashboard = () => {
                                     <div className="folder-icon class-icon">
                                         <GraduationCap size={32} />
                                     </div>
-                                    <h3>{cls}</h3>
-                                    <p>{subjectCount} Subjects • {bookCount} Books</p>
+                                    <h3>{getClassDisplay(cls)}</h3>
+                                    <p>{subjectCount} {t.teacher.subjects} • {bookCount} {t.teacher.books}</p>
                                 </div>
                             );
                         })}
@@ -348,12 +365,12 @@ const AdminDashboard = () => {
                 {viewMode === "SUBJECTS" && (
                     <div className="admin-grid-cards">
                         {loading ? (
-                            <div className="empty-state-full"><p>Loading subjects...</p></div>
+                            <div className="empty-state-full"><p>{t.teacher.loading}</p></div>
                         ) : Object.keys(grouped[activeClass] || {}).length === 0 ? (
                             <div className="empty-state-full">
                                 <Folder size={48} className="text-slate-300 mb-4" />
-                                <p>No subjects added to {activeClass} yet.</p>
-                                <button className="btn-text" onClick={openUploadModal}>Upload a book to create a subject</button>
+                                <p>{t.teacher.noSubjectsDesc.replace("{class}", getClassDisplay(activeClass))}</p>
+                                <button className="btn-text" onClick={openUploadModal}>{t.teacher.uploadToCreate}</button>
                             </div>
                         ) : (
                             Object.entries(grouped[activeClass] || {}).map(([subj, booksList]) => (
@@ -362,7 +379,7 @@ const AdminDashboard = () => {
                                         <Library size={32} />
                                     </div>
                                     <h3>{subj}</h3>
-                                    <p>{booksList.length} Books</p>
+                                    <p>{booksList.length} {t.teacher.books}</p>
                                 </div>
                             ))
                         )}
@@ -377,7 +394,7 @@ const AdminDashboard = () => {
                                 <div style={{ width: '80px', height: '80px', background: '#f0fdf4', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                                     <CheckCircle2 size={40} color="#166534" />
                                 </div>
-                                <p>No oral tests pending review. Nice work!</p>
+                                <p>{t.teacher.noOralTests}</p>
                             </div>
                         ) : (
                             pendingOralTests.map(test => (
@@ -422,10 +439,10 @@ const AdminDashboard = () => {
                     <div className="review-interface" style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid #f1f5f9', paddingBottom: '20px' }}>
                             <div>
-                                <h2 style={{ fontSize: '1.5rem', marginBottom: '4px' }}>Review: {selectedOralTest.student_name}</h2>
+                                <h2 style={{ fontSize: '1.5rem', marginBottom: '4px' }}>{t.teacher.reviewHeader.replace("{student}", selectedOralTest.student_name)}</h2>
                                 <p style={{ color: '#64748b' }}>{selectedOralTest.book_name} ({selectedOralTest.metadata.mode})</p>
                             </div>
-                            <button className="btn-secondary" onClick={() => setSelectedOralTest(null)}>Cancel</button>
+                            <button className="btn-secondary" onClick={() => setSelectedOralTest(null)}>{t.teacher.cancel}</button>
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
@@ -464,7 +481,7 @@ const AdminDashboard = () => {
                                     {/* Right: Scoring Controls */}
                                     <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '20px' }}>
                                         <div style={{ marginBottom: '20px' }}>
-                                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', color: '#64748b' }}>ASSIGN SCORE</label>
+                                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', color: '#64748b' }}>{t.teacher.assignScore}</label>
                                             <div style={{ display: 'flex', gap: '8px' }}>
                                                 {[1, 2, 3, 4, 5].map(s => (
                                                     <button
@@ -488,9 +505,9 @@ const AdminDashboard = () => {
                                         </div>
 
                                         <div>
-                                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', color: '#64748b' }}>TEACHER FEEDBACK</label>
+                                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', color: '#64748b' }}>{t.teacher.teacherFeedback}</label>
                                             <textarea
-                                                placeholder="Enter comments for the student..."
+                                                placeholder={t.teacher.feedbackPlaceholder}
                                                 value={oralReviewData[i]?.feedback || ""}
                                                 onChange={(e) => setOralReviewData(prev => ({
                                                     ...prev,
@@ -508,19 +525,19 @@ const AdminDashboard = () => {
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         <Zap size={14} color="#0369a1" />
-                                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase' }}>AI Suggestion</span>
+                                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase' }}>{t.teacher.aiSuggestion}</span>
                                                     </div>
                                                     <span style={{
                                                         fontSize: '0.7rem', fontWeight: 700,
                                                         color: q.ai_analysis.confidence === 'high' ? '#16a34a' : (q.ai_analysis.confidence === 'low' ? '#dc2626' : '#d97706')
                                                     }}>
-                                                        CONFIDENCE: {q.ai_analysis.confidence.toUpperCase()}
+                                                        {t.teacher.confidence}: {q.ai_analysis.confidence.toUpperCase()}
                                                     </span>
                                                 </div>
                                                 <p style={{ fontSize: '0.85rem', color: '#0c4a6e', margin: '0 0 10px 0', lineHeight: 1.4 }}>{q.ai_analysis.feedback}</p>
                                                 {q.ai_analysis.keywords_detected && q.ai_analysis.keywords_detected.length > 0 && (
                                                     <div style={{ marginTop: '8px' }}>
-                                                        <p style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', marginBottom: '4px', textTransform: 'uppercase' }}>Keyword Coverage</p>
+                                                        <p style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', marginBottom: '4px', textTransform: 'uppercase' }}>{t.teacher.keywordCoverage}</p>
                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                                             {q.ai_analysis.keywords_detected.map((kw, kwIdx) => (
                                                                 <span key={kwIdx} style={{ fontSize: '0.6rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', border: '1px solid #bae6fd' }}>{kw}</span>
@@ -535,7 +552,7 @@ const AdminDashboard = () => {
                                                     }))}
                                                     style={{ background: 'none', border: 'none', color: '#0369a1', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', padding: 0, marginTop: '12px', textDecoration: 'underline' }}
                                                 >
-                                                    Reset to AI Suggestions
+                                                    {t.teacher.resetToAi}
                                                 </button>
                                             </div>
                                         )}
@@ -545,14 +562,14 @@ const AdminDashboard = () => {
                         </div>
 
                         <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
-                            <button className="btn-secondary" onClick={() => setSelectedOralTest(null)}>Save for later</button>
+                            <button className="btn-secondary" onClick={() => setSelectedOralTest(null)}>{t.teacher.saveForLater}</button>
                             <button
                                 className="btn-primary"
                                 onClick={submitOralReview}
                                 disabled={submittingReview}
                                 style={{ padding: '12px 48px' }}
                             >
-                                {submittingReview ? "Submitting..." : "Complete & Send Review"}
+                                {submittingReview ? t.teacher.uploading : t.teacher.completeReview}
                             </button>
                         </div>
                     </div>
@@ -562,7 +579,7 @@ const AdminDashboard = () => {
                 {viewMode === "BOOKS" && (
                     <div className="book-list-container">
                         {loading ? (
-                            <div className="empty-state-full"><p>Loading books...</p></div>
+                            <div className="empty-state-full"><p>{t.teacher.loading}</p></div>
                         ) : (grouped[activeClass]?.[activeSubject] || []).length === 0 ? (
                             <div className="empty-state-full">
                                 <FileText size={48} className="text-slate-300 mb-4" />
@@ -592,7 +609,7 @@ const AdminDashboard = () => {
                                             <div className="name-box">
                                                 <span className="book-name">{book.file_name}</span>
                                                 <div className="book-meta" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span>{book.pages} pages • {(book.chunks / 1000).toFixed(1)}k chunks</span>
+                                                    <span>{book.pages} {t.teacher.pages} • {(book.chunks / 1000).toFixed(1)}k {t.teacher.chunks}</span>
                                                     <span className="sep">•</span>
                                                     {(() => {
                                                         const status = getSummaryStatus(book.book_id);
@@ -655,7 +672,7 @@ const AdminDashboard = () => {
                                                             gap: '6px'
                                                         }}
                                                     >
-                                                        <Search size={14} /> Keywords
+                                                        <Search size={14} /> {t.teacher.keywords}
                                                     </button>
                                                     <span className="sep" style={{ color: '#cbd5e1', margin: '0 4px' }}>•</span>
                                                     <button
@@ -684,7 +701,7 @@ const AdminDashboard = () => {
                                                             gap: '6px'
                                                         }}
                                                     >
-                                                        <CheckSquare size={14} /> Manage T/F
+                                                        <CheckSquare size={14} /> {t.teacher.manageTF}
                                                     </button>
                                                 </div>
                                             </div>
@@ -727,20 +744,20 @@ const AdminDashboard = () => {
                     <div className="modal-overlay">
                         <div className="modal-content">
                             <div className="modal-header">
-                                <h2>Upload Textbooks</h2>
+                                <h2>{t.teacher.uploadTitle}</h2>
                                 <button className="close-btn" onClick={() => setShowUploadModal(false)}><X size={20} /></button>
                             </div>
 
                             <div className="modal-body">
                                 <div className="form-group">
-                                    <label>Class</label>
+                                    <label>{t.teacher.selectClass}</label>
                                     <select value={uploadClass} onChange={(e) => setUploadClass(e.target.value)}>
-                                        {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        {CLASSES.map(c => <option key={c} value={c}>{getClassDisplay(c)}</option>)}
                                     </select>
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Subject Name</label>
+                                    <label>{t.teacher.subjectName}</label>
                                     <input
                                         type="text"
                                         placeholder="e.g. Physics, History"
@@ -759,15 +776,15 @@ const AdminDashboard = () => {
                                         onChange={(e) => setFiles(Array.from(e.target.files))}
                                     />
                                     <FolderPlus size={32} className="text-indigo-400 mb-2" />
-                                    <p>Click to select PDF files</p>
-                                    {files.length > 0 && <span className="file-tag">{files.length} files selected</span>}
+                                    <p>{t.teacher.clickToSelect}</p>
+                                    {files.length > 0 && <span className="file-tag">{t.teacher.filesSelected.replace("{count}", files.length)}</span>}
                                 </div>
                             </div>
 
                             <div className="modal-footer">
-                                <button className="btn-text" onClick={() => setShowUploadModal(false)}>Cancel</button>
+                                <button className="btn-text" onClick={() => setShowUploadModal(false)}>{t.teacher.cancel}</button>
                                 <button className="btn-primary" disabled={uploading || !files.length || !uploadSubject} onClick={handleUpload}>
-                                    {uploading ? "Uploading..." : "Upload Files"}
+                                    {uploading ? t.teacher.uploading : t.teacher.uploadFiles}
                                 </button>
                             </div>
                         </div>

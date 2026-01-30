@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations";
 import {
   ArrowRight,
   GraduationCap,
@@ -22,7 +24,10 @@ import {
   HelpCircle,
   ListChecks,
   MonitorPlay,
-  Search
+  Search,
+  Menu,
+  X,
+  Languages
 } from "lucide-react";
 
 // Assets
@@ -30,8 +35,12 @@ import heroImage from "../assets/images/Girl with laptop.svg";
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const { language, toggleLanguage } = useLanguage();
+  const t = translations[language];
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const scrollTo = (id) => {
+    setMobileMenuOpen(false); // Close menu on click
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
@@ -48,24 +57,59 @@ const LandingPage = () => {
             <span className="logo-tagline">Offline AI Study Companion</span>
           </a>
 
+          {/* Desktop Links */}
           <div className="nav-links">
-            <a href="#roles" onClick={(e) => { e.preventDefault(); scrollTo('roles'); }}>Users</a>
-            <a href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollTo('how-it-works'); }}>How it Works</a>
-            <a href="#offline" onClick={(e) => { e.preventDefault(); scrollTo('offline'); }}>Features</a>
-            <a href="#tools" onClick={(e) => { e.preventDefault(); scrollTo('tools'); }}>Tools</a>
-            <button className="nav-cta" onClick={() => navigate('/student/login')}>Get Started</button>
+            <a href="#roles" onClick={(e) => { e.preventDefault(); scrollTo('roles'); }}>{t.nav.users}</a>
+            <a href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollTo('how-it-works'); }}>{t.nav.howItWorks}</a>
+            <a href="#offline" onClick={(e) => { e.preventDefault(); scrollTo('offline'); }}>{t.nav.features}</a>
+            <a href="#tools" onClick={(e) => { e.preventDefault(); scrollTo('tools'); }}>{t.nav.tools}</a>
+
+            <button className="lang-toggle-btn" onClick={toggleLanguage} title={language === 'english' ? 'Telugu లోకి మారండి' : 'Switch to English'}>
+              <Languages size={18} />
+              <span>{language === 'english' ? 'తెలుగు' : 'English'}</span>
+            </button>
+
+            <button className="nav-cta" onClick={() => navigate('/student/login')}>{t.nav.getStarted}</button>
           </div>
+
+          {/* Mobile Hamburger */}
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
         </div>
       </nav>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="mobile-menu-overlay">
+          <div className="mobile-nav-links">
+            <a href="#roles" onClick={(e) => { e.preventDefault(); scrollTo('roles'); }}>{t.nav.users}</a>
+            <a href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollTo('how-it-works'); }}>{t.nav.howItWorks}</a>
+            <a href="#offline" onClick={(e) => { e.preventDefault(); scrollTo('offline'); }}>{t.nav.features}</a>
+            <a href="#tools" onClick={(e) => { e.preventDefault(); scrollTo('tools'); }}>{t.nav.tools}</a>
+
+            <button className="lang-toggle-btn-mobile" onClick={toggleLanguage}>
+              <Languages size={20} />
+              <span>{language === 'english' ? 'తెలుగు' : 'English'}</span>
+            </button>
+
+            <button className="nav-cta mobile-cta" onClick={() => navigate('/student/login')}>{t.nav.getStarted}</button>
+          </div>
+        </div>
+      )}
 
       {/* HERO */}
       <section className="hero container">
         <div className="hero-grid">
           <div className="hero-text">
-            <h1>Your personal <br /><span className="gradient-text">AI study space</span></h1>
-            <p>Where focused study meets intelligent practice.</p>
+            <h1>{t.hero.title}</h1>
+            <p>{t.hero.subtitle}</p>
             <button className="btn-primary" onClick={() => navigate('/student/login')}>
-              Start Learning Now <ArrowRight size={20} />
+              {t.hero.cta} <ArrowRight size={20} />
             </button>
           </div>
           <div className="hero-image">
@@ -78,31 +122,29 @@ const LandingPage = () => {
       <section id="roles" className="section-padding">
         <div className="container">
           <div className="section-header">
-            <h2>Designed for Growth</h2>
-            <p>Clear responsibilities for teachers and powerful tools for students.</p>
+            <h2>{t.roles.title}</h2>
+            <p>{t.roles.subtitle}</p>
           </div>
 
           <div className="role-split">
             <div className="role-v2-card student">
-              <h3>For Students</h3>
+              <h3>{t.roles.forStudents}</h3>
               <ul className="role-features">
-                <li><CheckCircle2 size={18} /> Chapter-wise learning</li>
-                <li><CheckCircle2 size={18} /> Ask doubts freely and privately</li>
-                <li><CheckCircle2 size={18} /> Practice with generated quizzes</li>
-                <li><CheckCircle2 size={18} /> Learn at your own pace</li>
+                {t.roles.studentsFeatures.map((f, i) => (
+                  <li key={i}><CheckCircle2 size={18} /> {f}</li>
+                ))}
               </ul>
-              <button className="btn-primary" onClick={() => navigate('/student/login')}>Explore Student Space</button>
+              <button className="btn-primary" onClick={() => navigate('/student/login')}>{t.roles.exploreStudents}</button>
             </div>
 
             <div className="role-v2-card teacher">
-              <h3>For Teachers</h3>
+              <h3>{t.roles.forTeachers}</h3>
               <ul className="role-features">
-                <li><CheckCircle2 size={18} /> Seamlessly upload textbooks</li>
-                <li><CheckCircle2 size={18} /> Organize by class and subject</li>
-                <li><CheckCircle2 size={18} /> No AI training or internet needed</li>
-                <li><CheckCircle2 size={18} /> Perfect for school labs</li>
+                {t.roles.teachersFeatures.map((f, i) => (
+                  <li key={i}><CheckCircle2 size={18} /> {f}</li>
+                ))}
               </ul>
-              <button className="btn-secondary" onClick={() => navigate('/teacher')}>Manage Digital Library</button>
+              <button className="btn-secondary" onClick={() => navigate('/teacher')}>{t.roles.manageLibrary}</button>
             </div>
           </div>
         </div>
@@ -112,29 +154,21 @@ const LandingPage = () => {
       <section id="how-it-works" className="section-padding">
         <div className="container">
           <div className="section-header">
-            <h2>How It Works</h2>
-            <p>A simple 3-step flow to transform your textbooks into an interactive experience.</p>
+            <h2>{t.howItWorks.title}</h2>
+            <p>{t.howItWorks.subtitle}</p>
           </div>
 
           <div className="steps-grid">
-            <div className="step-card">
-              <div className="step-num">1</div>
-              <div className="offline-icon" style={{ margin: '0 auto 20px' }}><Upload size={24} /></div>
-              <h3>Teacher Uploads</h3>
-              <p>Teachers upload standard PDFs of textbooks to the secure local library.</p>
-            </div>
-            <div className="step-card">
-              <div className="step-num">2</div>
-              <div className="offline-icon" style={{ margin: '0 auto 20px' }}><Cpu size={24} /></div>
-              <h3>AI Understands</h3>
-              <p>The system understands the content chapter-by-chapter without internet.</p>
-            </div>
-            <div className="step-card">
-              <div className="step-num">3</div>
-              <div className="offline-icon" style={{ margin: '0 auto 20px' }}><BookOpen size={24} /></div>
-              <h3>Student Studies</h3>
-              <p>Students select a book and start chatting with their personal AI tutor.</p>
-            </div>
+            {t.howItWorks.steps.map((s, i) => (
+              <div className="step-card" key={i}>
+                <div className="step-num">{i + 1}</div>
+                <div className="offline-icon" style={{ margin: '0 auto 20px' }}>
+                  {i === 0 ? <Upload size={24} /> : i === 1 ? <Cpu size={24} /> : <BookOpen size={24} />}
+                </div>
+                <h3>{s.title}</h3>
+                <p>{s.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -143,23 +177,23 @@ const LandingPage = () => {
       <section id="offline" className="section-padding bg-light">
         <div className="container">
           <div className="section-header">
-            <h2>Study without distractions</h2>
-            <p>Built for environments where focus is the priority. No internet required, no data leaves your device.</p>
+            <h2>{t.features.title}</h2>
+            <p>{t.features.subtitle}</p>
           </div>
 
           <div className="offline-grid">
             <div className="offline-card">
               <div className="offline-icon"><WifiOff size={28} /></div>
               <div className="offline-info">
-                <h3>Works Fully Offline</h3>
-                <p>The AI brain runs locally on your machine. You don't need a single byte of data to study.</p>
+                <h3>{t.features.offline.title}</h3>
+                <p>{t.features.offline.desc}</p>
               </div>
             </div>
             <div className="offline-card">
               <div className="offline-icon"><ShieldCheck size={28} /></div>
               <div className="offline-info">
-                <h3>Private & Secure</h3>
-                <p>Your questions and textbook data stay on your computer. Private by design, safe for schools.</p>
+                <h3>{t.features.private.title}</h3>
+                <p>{t.features.private.desc}</p>
               </div>
             </div>
           </div>
@@ -170,23 +204,19 @@ const LandingPage = () => {
       <section id="tools" className="section-padding">
         <div className="container">
           <div className="section-header">
-            <h2>Comprehensive Study Tools</h2>
-            <p>Everything you need to master your curriculum, powered by offline intelligence.</p>
+            <h2>{t.tools.title}</h2>
+            <p>{t.tools.subtitle}</p>
           </div>
 
           <div className="tool-previews">
-            <ToolCard icon={<MessageSquare size={24} />} title="AI Chat Tutor" benefit="Instant clarity on any topic from your textbook." />
-            <ToolCard icon={<FileText size={24} />} title="Chapter Summaries" benefit="Quickly grasp core concepts of every lesson." />
-            <ToolCard icon={<Zap size={24} />} title="Smart Quizzes" benefit="Test your knowledge with auto-generated questions." />
-            <ToolCard icon={<Users size={24} />} title="Mind Maps" benefit="Visualize connections between different concepts." />
-            {/* <ToolCard icon={<Grid size={24} />} title="Match the Following" benefit="Connect concepts with definitions interactively." /> */}
-            <ToolCard icon={<CheckSquare size={24} />} title="True or False" benefit="Quick fact-checking from textbook content." />
-            <ToolCard icon={<Layout size={24} />} title="One Page Revision" benefit="Condense entire chapters into single sheets." />
-            <ToolCard icon={<Search size={24} />} title="Keyword Explorer" benefit="Instant definitions for complex terms." />
-            {/* <ToolCard icon={<Scale size={24} />} title="Compare & Contrast" benefit="Side-by-side analysis of similar topics." /> */}
-            {/* <ToolCard icon={<HelpCircle size={24} />} title="Doubt Detector" benefit="Identifying confusing areas automatically." /> */}
-            {/* <ToolCard icon={<ListChecks size={24} />} title="What Did I Miss" benefit="Gap analysis for your written answers." /> */}
-            <ToolCard icon={<GraduationCap size={24} />} title="Oral Tests" benefit="Prepare for exams with interactive AI questioning." />
+            <ToolCard icon={<MessageSquare size={24} />} title={t.tools.items.chat} benefit="Instant clarity on any topic from your textbook." />
+            <ToolCard icon={<FileText size={24} />} title={t.tools.items.summary} benefit="Quickly grasp core concepts of every lesson." />
+            <ToolCard icon={<Zap size={24} />} title={t.tools.items.quiz} benefit="Test your knowledge with auto-generated questions." />
+            <ToolCard icon={<Users size={24} />} title={t.tools.items.mindmap} benefit="Visualize connections between different concepts." />
+            <ToolCard icon={<CheckSquare size={24} />} title={t.tools.items.truefalse} benefit="Quick fact-checking from textbook content." />
+            <ToolCard icon={<Layout size={24} />} title={t.tools.items.revision} benefit="Condense entire chapters into single sheets." />
+            <ToolCard icon={<Search size={24} />} title={t.tools.items.keywords} benefit="Instant definitions for complex terms." />
+            <ToolCard icon={<GraduationCap size={24} />} title={t.tools.items.oral_test} benefit="Prepare for exams with interactive AI questioning." />
           </div>
         </div>
       </section>
@@ -224,12 +254,12 @@ const LandingPage = () => {
           <div className="footer-content-simple">
             <div className="footer-brand-simple">
               <h2>ShikshaAI</h2>
-              <p>&copy; {new Date().getFullYear()} Private, offline AI study companion.</p>
+              <p>&copy; {new Date().getFullYear()} {t.footer.brand}</p>
             </div>
             <div className="footer-links-simple">
-              <a href="/teacher" onClick={(e) => { e.preventDefault(); navigate('/teacher'); }}>Teacher Login</a>
+              <a href="/teacher" onClick={(e) => { e.preventDefault(); navigate('/teacher'); }}>{t.footer.teacherLogin}</a>
               <span className="divider">|</span>
-              <a href="#tools" onClick={(e) => { e.preventDefault(); scrollTo('tools'); }}>Tools</a>
+              <a href="#tools" onClick={(e) => { e.preventDefault(); scrollTo('tools'); }}>{t.nav.tools}</a>
               <span className="divider">|</span>
               <span>v1.0.0 (Local)</span>
             </div>

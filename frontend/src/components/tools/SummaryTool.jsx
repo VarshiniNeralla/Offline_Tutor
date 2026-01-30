@@ -15,11 +15,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import { useLanguage } from '../../context/LanguageContext';
+import { translations } from '../../translations';
 import '../../assets/styles/student-dashboard.css';
 
 const SummaryTool = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { language } = useLanguage();
+    const t = translations[language];
     const { subject, bookId, bookName, class: className, role = 'student' } = location.state || {}; // role can be 'teacher' or 'student'
 
     const CACHE_VERSION = 'v2'; // Bumped for schema change
@@ -116,7 +120,7 @@ const SummaryTool = () => {
                     message: prompt,
                     subjects: [subject],
                     book_ids: [bookId],
-                    language: 'english', // Added missing required field
+                    language: language,
                     mode: 'summary'
                 })
             });
@@ -270,7 +274,7 @@ const SummaryTool = () => {
                             <div className="icon-badge">
                                 <Sparkles size={18} />
                             </div>
-                            <h1 style={{ fontSize: '1.2rem', fontWeight: 700 }}>AI Summary Tool</h1>
+                            <h1 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{t.tools.items.summaries}</h1>
                         </div>
                     </div>
                 </header>
@@ -284,15 +288,15 @@ const SummaryTool = () => {
                         <div className="hero-icon-wrapper">
                             <Zap size={40} className="zap-icon" />
                         </div>
-                        <h2 className="hero-title">Unlock New Insights!</h2>
+                        <h2 className="hero-title">{t.summary.welcomeHeader}</h2>
                         <p className="hero-text">
                             {role === 'teacher'
                                 ? "Transform this textbook into a powerful study guide. Review student drafts or generate your own magic."
-                                : "No summary yet! Be the first to generate a fresh AI draft and supercharge your learning today."}
+                                : t.summary.welcomeSubheader}
                         </p>
                         <button className="primary-btn-glow" onClick={() => generateSummary()}>
                             <Sparkles size={20} style={{ marginRight: '10px' }} />
-                            Magic Generate
+                            {t.summary.start}
                         </button>
                     </motion.div>
                 </main>
@@ -317,7 +321,7 @@ const SummaryTool = () => {
                         </button>
                         <div>
                             <h1 style={{ fontSize: '1.2rem', marginBottom: 'px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                {role === 'teacher' ? "Manage Summary" : "AI Summary Tool"}
+                                {role === 'teacher' ? "Manage Summary" : t.tools.items.summaries}
                                 <Sparkles size={16} color="var(--primary)" />
                             </h1>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{bookName}</p>
@@ -349,7 +353,7 @@ const SummaryTool = () => {
                                 <div className="spinner-large" style={{ margin: '0 auto 24px' }}>
                                     <Zap size={30} className="zap-spin" />
                                 </div>
-                                <h3 className="loading-text">{role === 'teacher' ? "Weaving Knowledge..." : "Personalizing Summary..."}</h3>
+                                <h3 className="loading-text">{role === 'teacher' ? "Weaving Knowledge..." : t.summary.generating}</h3>
 
                                 {/* Progress Bar UI */}
                                 <div className="progress-container-v2" style={{ margin: '24px 0', background: 'rgba(255,255,255,0.5)', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
@@ -364,9 +368,9 @@ const SummaryTool = () => {
                                         }}
                                     />
                                 </div>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600, marginTop: '-16px', marginBottom: '16px' }}>{progress}% Complete</p>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600, marginTop: '-16px', marginBottom: '16px' }}>{progress}% {t.tf.complete || 'Complete'}</p>
 
-                                <p className="loading-sub">Distilling the essence of your textbook into tiny bits of awesome.</p>
+                                <p className="loading-sub">{t.summary.generatingDesc}</p>
                             </div>
                         </motion.div>
                     ) : error ? (
@@ -393,7 +397,7 @@ const SummaryTool = () => {
                             {/* VERSION SELECTOR (Teacher Only) */}
                             {role === 'teacher' && displayHistory.length > 1 && (
                                 <div className="version-bar-v2">
-                                    <div className="version-label">Audit Logs:</div>
+                                    <div className="version-label">{t.summary.auditLogs}:</div>
                                     <div className="version-tabs-scroll">
                                         {displayHistory.map((v, idx) => (
                                             <button
@@ -416,15 +420,15 @@ const SummaryTool = () => {
                                         <div style={{ display: 'flex', gap: '12px' }}>
                                             {currentSummary.type === 'teacher' ? (
                                                 <div className="status-label-v2 approved">
-                                                    <CheckCircle2 size={14} /> Teacher Verified
+                                                    <CheckCircle2 size={14} /> {t.summary.teacherVerified}
                                                 </div>
                                             ) : (
                                                 <div className="status-label-v2 draft">
-                                                    <Zap size={14} /> {role === 'teacher' ? "Student Draft" : "AI Personal Draft"}
+                                                    <Zap size={14} /> {role === 'teacher' ? t.summary.studentDraft : t.summary.aiDraft}
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="summary-version-tag">Version {currentSummary.version}</div>
+                                        <div className="summary-version-tag">{t.summary.version} {currentSummary.version}</div>
                                     </div>
 
                                     {isEditing ? (
@@ -438,8 +442,8 @@ const SummaryTool = () => {
                                                 style={{ flex: 1 }}
                                             />
                                             <div className="edit-actions-footer">
-                                                <button className="cancel-pill" onClick={() => setIsEditing(false)}>Discard</button>
-                                                <button className="save-pill" onClick={handleSave}>Finalize & Approve</button>
+                                                <button className="cancel-pill" onClick={() => setIsEditing(false)}>{t.summary.discard}</button>
+                                                <button className="save-pill" onClick={handleSave}>{t.summary.approve}</button>
                                             </div>
                                         </div>
                                     ) : (
@@ -452,14 +456,14 @@ const SummaryTool = () => {
                                                 <div className="author-info">
                                                     <div className="avatar-mini">{currentSummary.author[0]}</div>
                                                     <div>
-                                                        <p className="by-text">By {currentSummary.author}</p>
+                                                        <p className="by-text">{t.summary.by} {currentSummary.author}</p>
                                                         <p className="time-text">{new Date(currentSummary.timestamp).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</p>
                                                     </div>
                                                 </div>
 
                                                 {role === 'teacher' && (
                                                     <button className="edit-fab" onClick={handleEdit}>
-                                                        <Edit2 size={18} /> Edit Now
+                                                        <Edit2 size={18} /> {t.summary.editNow}
                                                     </button>
                                                 )}
                                             </div>

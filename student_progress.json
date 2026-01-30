@@ -1606,5 +1606,245 @@
         },
         "attempt_id": "603a933c-1aa4-4430-87b0-078a6732eb17",
         "timestamp": "2026-01-16T23:33:56.906425"
+    },
+    {
+        "type": "quiz",
+        "student_name": "Nidhi",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 2,
+        "total_questions": 5,
+        "questions": [
+            {
+                "id": 1,
+                "question": "What are oceans and continents?",
+                "options": [
+                    "A) Islands, seas, and landmasses",
+                    "B) Landmasses, seas, and islands",
+                    "C) Seas, landmasses, and oceans",
+                    "D) Oceans, landmasses, and seas"
+                ],
+                "correct_index": 2,
+                "explanation": "Oceans are vast bodies of saltwater covering most of the Earth's surface. Continents are large landmasses that make up the outer part of the Earth.",
+                "user_answer": 1
+            },
+            {
+                "id": 2,
+                "question": "What do you know about the circular lines in each map?",
+                "options": [
+                    "A) They are called meridians",
+                    "B) They are called parallels",
+                    "C) They are called latitudes",
+                    "D) They are called longitudes"
+                ],
+                "correct_index": 0,
+                "explanation": "Meridians and parallels are the major divisions of Earth's surface, with meridians being lines running from north to south (longitude), and parallels being circles around the Earth at different latitudes.",
+                "user_answer": 1
+            },
+            {
+                "id": 3,
+                "question": "Which hemisphere holds more water?",
+                "options": [
+                    "A) Northern Hemisphere",
+                    "B) Southern Hemisphere",
+                    "C) Both Hemispheres equally",
+                    "D) Neither Hemisphere"
+                ],
+                "correct_index": 1,
+                "explanation": "The Northern Hemisphere has a larger proportion of land compared to the Southern Hemisphere, which results in it having more oceans and seas.",
+                "user_answer": 1
+            },
+            {
+                "id": 4,
+                "question": "What do you think could be the approximate proportion of water to land in the Northern Hemisphere?",
+                "options": [
+                    "A) 70%",
+                    "B) 50%",
+                    "C) 30%",
+                    "D) 20%"
+                ],
+                "correct_index": 1,
+                "explanation": "The Northern Hemisphere has a larger ocean coverage, which means it is more likely to have a higher proportion of water compared to land.",
+                "user_answer": 0
+            },
+            {
+                "id": 5,
+                "question": "Are all the oceans connected with one another or are there separations between them?",
+                "options": [
+                    "A) All oceans are connected",
+                    "B) There are no connections between oceans",
+                    "C) Oceans are partially connected but not fully",
+                    "D) Some oceans are completely separated"
+                ],
+                "correct_index": 0,
+                "explanation": "The Earth's oceans are interconnected through various waterways and currents, forming a vast system.",
+                "user_answer": 0
+            }
+        ],
+        "metadata": null,
+        "attempt_id": "ba83d0b4-e88f-4761-850f-0e37885fb7aa",
+        "timestamp": "2026-01-30T13:41:40.651866"
+    },
+    {
+        "type": "quiz",
+        "student_name": "Nidhi",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 4,
+        "total_questions": 5,
+        "questions": [
+            {
+                "id": 1,
+                "question": "What are oceans and continents?",
+                "options": [
+                    "A) Islands, seas, and landmasses",
+                    "B) Landmasses, seas, and islands",
+                    "C) Seas, landmasses, and oceans",
+                    "D) Oceans, landmasses, and seas"
+                ],
+                "correct_index": 2,
+                "explanation": "Oceans are vast bodies of saltwater covering most of the Earth's surface. Continents are large landmasses that make up the outer part of the Earth.",
+                "user_answer": 0
+            },
+            {
+                "id": 2,
+                "question": "What do you know about the circular lines in each map?",
+                "options": [
+                    "A) They are called meridians",
+                    "B) They are called parallels",
+                    "C) They are called latitudes",
+                    "D) They are called longitudes"
+                ],
+                "correct_index": 0,
+                "explanation": "Meridians and parallels are the major divisions of Earth's surface, with meridians being lines running from north to south (longitude), and parallels being circles around the Earth at different latitudes.",
+                "user_answer": 0
+            },
+            {
+                "id": 3,
+                "question": "Which hemisphere holds more water?",
+                "options": [
+                    "A) Northern Hemisphere",
+                    "B) Southern Hemisphere",
+                    "C) Both Hemispheres equally",
+                    "D) Neither Hemisphere"
+                ],
+                "correct_index": 1,
+                "explanation": "The Northern Hemisphere has a larger proportion of land compared to the Southern Hemisphere, which results in it having more oceans and seas.",
+                "user_answer": 1
+            },
+            {
+                "id": 4,
+                "question": "What do you think could be the approximate proportion of water to land in the Northern Hemisphere?",
+                "options": [
+                    "A) 70%",
+                    "B) 50%",
+                    "C) 30%",
+                    "D) 20%"
+                ],
+                "correct_index": 1,
+                "explanation": "The Northern Hemisphere has a larger ocean coverage, which means it is more likely to have a higher proportion of water compared to land.",
+                "user_answer": 1
+            },
+            {
+                "id": 5,
+                "question": "Are all the oceans connected with one another or are there separations between them?",
+                "options": [
+                    "A) All oceans are connected",
+                    "B) There are no connections between oceans",
+                    "C) Oceans are partially connected but not fully",
+                    "D) Some oceans are completely separated"
+                ],
+                "correct_index": 0,
+                "explanation": "The Earth's oceans are interconnected through various waterways and currents, forming a vast system.",
+                "user_answer": 0
+            }
+        ],
+        "metadata": null,
+        "attempt_id": "c57b1853-ece3-4df7-b8d5-7c5af6813ac6",
+        "timestamp": "2026-01-30T13:49:41.899572"
+    },
+    {
+        "type": "quiz",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 5,
+        "total_questions": 5,
+        "questions": [
+            {
+                "id": 1,
+                "question": "What are oceans and continents?",
+                "options": [
+                    "A) Islands, seas, and landmasses",
+                    "B) Landmasses, seas, and islands",
+                    "C) Seas, landmasses, and oceans",
+                    "D) Oceans, landmasses, and seas"
+                ],
+                "correct_index": 2,
+                "explanation": "Oceans are vast bodies of saltwater covering most of the Earth's surface. Continents are large landmasses that make up the outer part of the Earth.",
+                "user_answer": 2
+            },
+            {
+                "id": 2,
+                "question": "What do you know about the circular lines in each map?",
+                "options": [
+                    "A) They are called meridians",
+                    "B) They are called parallels",
+                    "C) They are called latitudes",
+                    "D) They are called longitudes"
+                ],
+                "correct_index": 0,
+                "explanation": "Meridians and parallels are the major divisions of Earth's surface, with meridians being lines running from north to south (longitude), and parallels being circles around the Earth at different latitudes.",
+                "user_answer": 0
+            },
+            {
+                "id": 3,
+                "question": "Which hemisphere holds more water?",
+                "options": [
+                    "A) Northern Hemisphere",
+                    "B) Southern Hemisphere",
+                    "C) Both Hemispheres equally",
+                    "D) Neither Hemisphere"
+                ],
+                "correct_index": 1,
+                "explanation": "The Northern Hemisphere has a larger proportion of land compared to the Southern Hemisphere, which results in it having more oceans and seas.",
+                "user_answer": 1
+            },
+            {
+                "id": 4,
+                "question": "What do you think could be the approximate proportion of water to land in the Northern Hemisphere?",
+                "options": [
+                    "A) 70%",
+                    "B) 50%",
+                    "C) 30%",
+                    "D) 20%"
+                ],
+                "correct_index": 1,
+                "explanation": "The Northern Hemisphere has a larger ocean coverage, which means it is more likely to have a higher proportion of water compared to land.",
+                "user_answer": 1
+            },
+            {
+                "id": 5,
+                "question": "Are all the oceans connected with one another or are there separations between them?",
+                "options": [
+                    "A) All oceans are connected",
+                    "B) There are no connections between oceans",
+                    "C) Oceans are partially connected but not fully",
+                    "D) Some oceans are completely separated"
+                ],
+                "correct_index": 0,
+                "explanation": "The Earth's oceans are interconnected through various waterways and currents, forming a vast system.",
+                "user_answer": 0
+            }
+        ],
+        "metadata": null,
+        "attempt_id": "92cba2b6-8acb-45d1-abe9-a9d8e757b55a",
+        "timestamp": "2026-01-30T15:50:13.655399"
     }
 ]

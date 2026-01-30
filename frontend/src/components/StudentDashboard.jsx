@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations";
 import {
     GraduationCap,
     LogOut,
@@ -22,13 +24,26 @@ import {
     HelpCircle,
     ListChecks,
     History,
-    Share2
+    Share2,
+    Languages
 } from "lucide-react";
 
 import "../assets/styles/student-dashboard.css";
 
 const StudentDashboard = () => {
     const navigate = useNavigate();
+    const { language, toggleLanguage } = useLanguage();
+    const t = translations[language];
+
+    const getClassDisplay = (cls) => {
+        if (!cls) return "";
+        if (language === 'english') {
+            const num = cls.match(/\d+/);
+            return num ? `Class ${num[0]}` : cls;
+        }
+        const num = cls.match(/\d+/);
+        return num ? `తరగతి ${num[0]}` : cls;
+    };
     const [name, setName] = useState("");
     const [studentClass, setStudentClass] = useState("");
     const [subjects, setSubjects] = useState([]);
@@ -46,8 +61,16 @@ const StudentDashboard = () => {
     }, [activeSubject]);
 
     useEffect(() => {
-        const savedName = localStorage.getItem("studentName");
-        const savedClass = localStorage.getItem("studentClass");
+        let savedName = localStorage.getItem("studentName");
+        let savedClass = localStorage.getItem("studentClass");
+
+        if (savedClass && savedClass.includes("తరగతి")) {
+            const num = savedClass.match(/\d+/);
+            if (num) {
+                savedClass = `Class ${num[0]}`;
+                localStorage.setItem("studentClass", savedClass);
+            }
+        }
 
         if (!savedName || !savedClass) {
             navigate("/student/login");
@@ -108,14 +131,18 @@ const StudentDashboard = () => {
                         <div className="user-avatar"><GraduationCap size={20} /></div>
                         <div>
                             <h1>{name}</h1>
-                            <p>{studentClass} Student</p>
+                            <p>{getClassDisplay(studentClass)} {t.dashboard.studentLabel}</p>
                         </div>
                     </div>
                     <div className="header-actions">
-                        <button onClick={() => navigate("/student/progress")} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', borderColor: 'var(--primary-light)' }}>
-                            <History size={18} /> My Progress
+                        <button className="lang-toggle-btn" onClick={toggleLanguage} style={{ background: 'white', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' }}>
+                            <Languages size={18} />
+                            <span>{language === 'english' ? 'తెలుగు' : 'English'}</span>
                         </button>
-                        <button onClick={() => navigate("/student/login")}>Change Class</button>
+                        <button onClick={() => navigate("/student/progress")} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', borderColor: 'var(--primary-light)' }}>
+                            <History size={18} /> {t.dashboard.progress}
+                        </button>
+                        <button onClick={() => navigate("/student/login")}>{t.dashboard.changeClass}</button>
                         <button className="logout" onClick={logout}><LogOut size={18} /></button>
                     </div>
                 </div>
@@ -132,12 +159,12 @@ const StudentDashboard = () => {
                         >
                             <div className="dashboard-title">
                                 <div>
-                                    <h2>My Subjects</h2>
-                                    <p>Select a subject to continue learning</p>
+                                    <h2>{t.dashboard.mySubjects}</h2>
+                                    <p>{t.dashboard.selectSubject}</p>
                                 </div>
                                 <div className="search-box">
                                     <Search size={16} />
-                                    <input placeholder="Search subjects" />
+                                    <input placeholder={t.dashboard.searchSubjects} />
                                 </div>
                             </div>
 
@@ -166,8 +193,8 @@ const StudentDashboard = () => {
                                     }}>
                                         <Clock size={32} />
                                     </div>
-                                    <h3 style={{ margin: 0, color: "var(--text-main)", fontSize: "1.1rem" }}>No subjects added yet</h3>
-                                    <p style={{ margin: 0, maxWidth: "300px" }}>They will be uploaded soon.</p>
+                                    <h3 style={{ margin: 0, color: "var(--text-main)", fontSize: "1.1rem" }}>{t.dashboard.noSubjects}</h3>
+                                    <p style={{ margin: 0, maxWidth: "300px" }}>{t.dashboard.subjectsSoon}</p>
                                 </div>
                             ) : (
                                 <div className="subject-grid">
@@ -183,10 +210,10 @@ const StudentDashboard = () => {
                                             <div className="subject-icon"><BookOpen size={26} /></div>
                                             <h3>{sub.name}</h3>
                                             <div className="subject-meta">
-                                                <span>{sub.pages} pages</span><span>•</span><span>{sub.chunks} blocks</span>
+                                                <span>{sub.pages} {t.dashboard.pages}</span><span>•</span><span>{sub.chunks} {t.dashboard.blocks}</span>
                                             </div>
                                             <div className="subject-cta">
-                                                Open subject <ChevronRight size={16} />
+                                                {t.dashboard.openSubject} <ChevronRight size={16} />
                                             </div>
                                         </motion.div>
                                     ))}
@@ -197,6 +224,8 @@ const StudentDashboard = () => {
                         <SubjectHome
                             subject={activeSubject}
                             onBack={() => setActiveSubject(null)}
+                            t={t}
+                            language={language}
 
                             onStartBook={(book, toolType = 'chat') => {
                                 const cleanName = book.file_name.replace(/\.pdf$/i, '');
@@ -222,6 +251,8 @@ const StudentDashboard = () => {
                                     navigate("/oraltest", { state: toolState });
                                 } else if (toolType === 'mindmap') {
                                     navigate("/mindmap", { state: toolState });
+                                } else if (toolType === 'revision') {
+                                    navigate("/revision", { state: toolState });
                                 } else {
                                     navigate("/chat", {
                                         state: {
@@ -239,22 +270,18 @@ const StudentDashboard = () => {
     );
 };
 
-const SubjectHome = ({ subject, onBack, onStartBook }) => {
+const SubjectHome = ({ subject, onBack, onStartBook, t, language }) => {
     const [selectedTool, setSelectedTool] = useState(null);
 
     const tools = [
-        { id: 'quiz', icon: Zap, title: "AI Quiz", desc: "Test understanding" },
-        { id: 'summary', icon: BookOpen, title: "Summaries", desc: "Chapter notes" },
-        { id: 'keywords', icon: Search, title: "Keywords", desc: "Term explorer" },
-        { id: 'truefalse', icon: CheckSquare, title: "True/False", desc: "Fact checking" },
-        { id: 'flashcards', icon: FileText, title: "Flashcards", desc: "Key concepts" },
-        { id: 'oral', icon: Mic, title: "Oral Test", desc: "Speak answers" },
-        { id: 'mindmap', icon: Share2, title: "Mind Maps", desc: "Visualize connections" },
-        { id: 'revision', icon: Layout, title: "One Page", desc: "Revision Sheet" },
-        // { id: 'compare', icon: Scale, title: "Compare", desc: "Side by side" },
-        // { id: 'doubt', icon: HelpCircle, title: "Doubt", desc: "Detector" },
-        // { id: 'missed', icon: ListChecks, title: "Missed?", desc: "Gap analysis" }
-        // { id: 'match', icon: Grid, title: "Match It", desc: "Concept definitions" },
+        { id: 'quiz', icon: Zap, title: t.tools.items.quiz, desc: t.tools.descs.quiz },
+        { id: 'summary', icon: BookOpen, title: t.tools.items.summary, desc: t.tools.descs.summary },
+        { id: 'keywords', icon: Search, title: t.tools.items.keywords, desc: t.tools.descs.keywords },
+        { id: 'truefalse', icon: CheckSquare, title: t.tools.items.truefalse, desc: t.tools.descs.truefalse },
+        { id: 'flashcards', icon: FileText, title: t.tools.items.flashcards, desc: t.tools.descs.flashcards },
+        { id: 'oral', icon: Mic, title: t.tools.items.oral_test, desc: t.tools.descs.oral_test },
+        { id: 'mindmap', icon: Share2, title: t.tools.items.mindmap, desc: t.tools.descs.mindmap },
+        { id: 'revision', icon: Layout, title: t.tools.items.revision, desc: t.tools.descs.revision },
     ];
 
     if (selectedTool) {
@@ -267,18 +294,18 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                     <button className="back-btn" onClick={() => setSelectedTool(null)} style={{ margin: 0 }}>
-                        <ChevronLeft size={18} /> Back
+                        <ChevronLeft size={18} /> {t.dashboard.back}
                     </button>
                     <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
                         <selectedTool.icon size={18} />
-                        Generating {selectedTool.title}
+                        {t.dashboard.generatingTool} {selectedTool.title}
                     </div>
                 </div>
 
                 <div className="subject-hero">
-                    <h1>Select a Chapter</h1>
-                    <p>Choose a chapter to generate {selectedTool.title.toLowerCase()} for.</p>
+                    <h1>{t.dashboard.selectChapter}</h1>
+                    <p>{t.dashboard.chooseChapterFor} {t.tools.items[selectedTool.id]?.toLowerCase() || selectedTool.title.toLowerCase()}.</p>
                 </div>
 
                 <div className="book-selection-list">
@@ -295,11 +322,11 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
                                 <div className="book-select-icon"><FileText size={20} /></div>
                                 <div>
                                     <h4>{book.file_name.replace(/\.pdf$/i, '')}</h4>
-                                    <p>Ready for {selectedTool.title}</p>
+                                    <p>{language === 'english' ? `Ready for ${selectedTool.title}` : `${selectedTool.title} సిద్ధంగా ఉంది`}</p>
                                 </div>
                             </div>
                             <div className="book-select-action">
-                                <span>Generate</span>
+                                <span>{t.dashboard.generate}</span>
                                 <ChevronRight size={16} />
                             </div>
                         </motion.div>
@@ -317,20 +344,20 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
             exit={{ opacity: 0, x: 20 }}
         >
             <button className="back-btn" onClick={onBack}>
-                <ChevronLeft size={18} /> Back
+                <ChevronLeft size={18} /> {t.dashboard.back}
             </button>
 
             <div className="subject-hero">
                 <h1>{subject.name}</h1>
-                <p>Select a specific textbook or chapter to start studying.</p>
+                <p>{t.dashboard.selectTextbook}</p>
             </div>
 
-            <h3 className="section-title">Chapters & Textbooks</h3>
+            <h3 className="section-title">{t.dashboard.chapters}</h3>
             <div className="book-selection-list">
                 {subject.books.length === 0 ? (
                     <div className="empty-state-mini">
                         <AlertCircle size={20} />
-                        <p>No textbooks added for this subject yet.</p>
+                        <p>{language === 'english' ? "No textbooks added for this subject yet." : "ఈ సబ్జెక్టుకు ఇంకా పాఠ్యపుస్తకాలు జోడించబడలేదు."}</p>
                     </div>
                 ) : (
                     subject.books.map((book) => (
@@ -347,11 +374,11 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
                                 </div>
                                 <div>
                                     <h4>{book.file_name.replace(/\.pdf$/i, '')}</h4>
-                                    <p>{book.pages} pages • {book.chunks} blocks</p>
+                                    <p>{book.pages} {t.dashboard.pages} • {book.chunks} {t.dashboard.blocks}</p>
                                 </div>
                             </div>
                             <div className="book-select-action">
-                                <span>Study</span>
+                                <span>{t.dashboard.study}</span>
                                 <ChevronRight size={16} />
                             </div>
                         </motion.div>
@@ -359,7 +386,7 @@ const SubjectHome = ({ subject, onBack, onStartBook }) => {
                 )}
             </div>
 
-            <h3 className="section-title">Study Tools</h3>
+            <h3 className="section-title">{t.dashboard.studyTools}</h3>
 
             <div className="tool-grid">
                 {tools.map(tool => (
