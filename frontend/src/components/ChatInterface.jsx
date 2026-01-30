@@ -271,6 +271,57 @@ const ChatInterface = () => {
 
   const bottomRef = useRef(null);
   const hasInitialized = useRef(false);
+  const recognitionRef = useRef(null);
+  const textBeforeRecording = useRef("");
+
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+
+      recognitionRef.current.onresult = (event) => {
+        let fullSessionTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          fullSessionTranscript += event.results[i][0].transcript;
+        }
+        const spacer = (textBeforeRecording.current && !textBeforeRecording.current.endsWith(' ')) ? ' ' : '';
+        setInput(textBeforeRecording.current + spacer + fullSessionTranscript);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error("Speech recognition error", event.error);
+        if (event.error === 'no-speech') return;
+        setListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        if (listening) setListening(false);
+      };
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    if (listening) {
+      recognitionRef.current.stop();
+      setListening(false);
+    } else {
+      textBeforeRecording.current = input;
+      recognitionRef.current.lang = language === 'telugu' ? 'te-IN' : 'en-US';
+      try {
+        recognitionRef.current.start();
+        setListening(true);
+      } catch (e) {
+        console.error("Start error:", e);
+      }
+    }
+  };
 
   // 2. INITIALIZE SESSION
   useEffect(() => {
@@ -473,6 +524,30 @@ const ChatInterface = () => {
 
   return (
     <div className="chat-layout">
+      <style>{`
+            .waveform-box {
+                display: flex;
+                align-items: center;
+                gap: 3px;
+                padding: 0 10px;
+                height: 24px;
+            }
+            .wave-bar {
+                width: 3px;
+                background-color: #6366f1;
+                border-radius: 2px;
+                animation: wave-anim 1s ease-in-out infinite;
+            }
+            .wave-bar:nth-child(1) { animation-delay: 0.0s; height: 40%; }
+            .wave-bar:nth-child(2) { animation-delay: 0.1s; height: 80%; }
+            .wave-bar:nth-child(3) { animation-delay: 0.2s; height: 50%; }
+            .wave-bar:nth-child(4) { animation-delay: 0.3s; height: 90%; }
+            .wave-bar:nth-child(5) { animation-delay: 0.4s; height: 60%; }
+            @keyframes wave-anim {
+                0%, 100% { height: 30%; }
+                50% { height: 100%; }
+            }
+        `}</style>
       {/* SIDEBAR */}
       <aside className={`chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
@@ -600,7 +675,7 @@ const ChatInterface = () => {
           <div className="input-wrapper">
             <button
               className={`icon-btn ${listening ? "listening" : ""}`}
-              onClick={() => setListening(!listening)}
+              onClick={toggleListening}
             >
               <Mic size={20} />
             </button>
@@ -612,6 +687,16 @@ const ChatInterface = () => {
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               disabled={!activeChatId}
             />
+
+            {listening && (
+              <div className="waveform-box">
+                <div className="wave-bar"></div>
+                <div className="wave-bar"></div>
+                <div className="wave-bar"></div>
+                <div className="wave-bar"></div>
+                <div className="wave-bar"></div>
+              </div>
+            )}
 
             <button
               className="send-btn"
