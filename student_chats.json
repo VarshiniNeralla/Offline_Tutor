@@ -1,5 +1,21 @@
 [
   {
+    "id": "1770397302377",
+    "title": "Chat Mode",
+    "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+    "bookName": "Oceans and Continents",
+    "subject": "Social",
+    "className": "Class 6",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "I'm ready to help with the **chat** tool for *Oceans and Continents*. What do you need?",
+        "sources": []
+      }
+    ],
+    "timestamp": "2026-02-06T17:01:42.377Z"
+  },
+  {
     "id": "1770390987557",
     "title": "Chat Mode",
     "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",

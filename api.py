@@ -3,7 +3,7 @@ import shutil
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import uvicorn
@@ -11,18 +11,21 @@ from contextlib import asynccontextmanager
 import asyncio
 import threading
 import json
+import io
 
 # Import backend logic
 from tutor_backend_multilingual import AITextbookTutorMultilingualBackend
 from admin_backend import AITextbookAdminBackendOffline
 from progress_manager import ProgressManager
 from chat_manager import ChatManager
+from tts_manager import TTSManager
 
 # Global instances
 tutor_backend = None
 admin_backend = None
 progress_manager = ProgressManager()
 chat_manager = ChatManager()
+tts_manager = TTSManager()
 oral_review_queue = asyncio.Queue()
 
 @asynccontextmanager
@@ -162,6 +165,57 @@ async def get_stats():
     if not admin_backend:
         raise HTTPException(status_code=503, detail="System initializing")
     return admin_backend.get_system_stats()
+
+@app.post("/api/transcribe")
+async def transcribe_generated_audio(file: UploadFile = File(...)):
+    """Generic endpoint for transcribing audio (STT)"""
+    if not tutor_backend:
+        raise HTTPException(status_code=503, detail="System initializing")
+    
+    try:
+        # Read file into BytesIO
+        audio_content = await file.read()
+        import io
+        audio_file = io.BytesIO(audio_content)
+        
+        # Transcribe
+        text = tutor_backend.transcribe_audio(audio_file)
+        
+        # Check for error prefixes from backend
+        if text.startswith("❌"):
+             raise HTTPException(status_code=500, detail=text)
+             
+        return {"text": text}
+    except Exception as e:
+        print(f"❌ Transcription failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class TTSRequest(BaseModel):
+    text: str
+    language: str = "english"
+
+@app.post("/api/tts")
+def text_to_speech(request: TTSRequest):
+    """Generic endpoint for Text-to-Speech (TTS) using Dedicated Worker"""
+    # Use the dedicated TTS manager
+    audio_path = tts_manager.generate_audio(request.text, request.language)
+    
+    if not audio_path or not os.path.exists(audio_path):
+        raise HTTPException(status_code=500, detail="TTS generation failed")
+        
+    # Read bytes to memory so we can delete file
+    with open(audio_path, 'rb') as f:
+        audio_data = io.BytesIO(f.read())
+        
+    # Cleanup temp file
+    try:
+        os.unlink(audio_path)
+    except:
+        pass
+        
+    # Return as streaming response
+    return StreamingResponse(audio_data, media_type="audio/wav")
+
 
 # --- Chat History Endpoints ---
 

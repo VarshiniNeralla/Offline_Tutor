@@ -8,7 +8,9 @@ import {
   Trash2,
   FileText,
   Languages,
-  Sparkles
+  Sparkles,
+  Volume2,
+  Square
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -48,8 +50,10 @@ const ChatInterface = () => {
 
   const bottomRef = useRef(null);
   const hasInitialized = useRef(false);
-  const recognitionRef = useRef(null);
-  const textBeforeRecording = useRef("");
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const currentAudioRef = useRef(null);
+  const [playingMsgIndex, setPlayingMsgIndex] = useState(null);
 
   // Load from Backend on Mount & Sync
   useEffect(() => {
@@ -67,62 +71,115 @@ const ChatInterface = () => {
     // but we could use another flag 'isSynced' if needed. For now, this is fine.
   }, []);
 
-  useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-
-      recognitionRef.current.onresult = (event) => {
-        let fullSessionTranscript = '';
-        for (let i = 0; i < event.results.length; ++i) {
-          fullSessionTranscript += event.results[i][0].transcript;
-        }
-        const spacer = (textBeforeRecording.current && !textBeforeRecording.current.endsWith(' ')) ? ' ' : '';
-        setInput(textBeforeRecording.current + spacer + fullSessionTranscript);
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
-        if (event.error === 'no-speech') return;
-        if (event.error === 'network') {
-          alert(t.chat.networkError);
-        }
-        setListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        if (listening) setListening(false);
-      };
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert("Speech recognition is not supported in this browser.");
-      return;
-    }
-
-    if (!navigator.onLine) {
-      alert(t.chat.networkError);
-      return;
-    }
-
+  const toggleListening = async () => {
     if (listening) {
-      recognitionRef.current.stop();
-      setListening(false);
+      // STOP RECORDING
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+        setListening(false);
+      }
     } else {
-      textBeforeRecording.current = input;
-      recognitionRef.current.lang = language === 'telugu' ? 'te-IN' : 'en-US';
+      // START RECORDING (Offline-capable via Backend)
       try {
-        recognitionRef.current.start();
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+          // Send to Backend
+          const formData = new FormData();
+          formData.append("file", audioBlob, "recording.webm");
+
+          try {
+            // Show temporary loading indicator in input?
+            setInput("Transcribing...");
+
+            const res = await fetch("/api/transcribe", {
+              method: "POST",
+              body: formData
+            });
+
+            if (!res.ok) throw new Error("Transcription failed");
+
+            const data = await res.json();
+            setInput(data.text || "");
+
+          } catch (err) {
+            console.error("STT Error:", err);
+            alert("Failed to transcribe audio. Please try again.");
+            setInput("");
+          } finally {
+            // Stop all tracks to release mic
+            stream.getTracks().forEach(track => track.stop());
+          }
+        };
+
+        mediaRecorder.start();
         setListening(true);
-      } catch (e) {
-        console.error("Start error:", e);
+      } catch (err) {
+        console.error("Mic Access Error:", err);
+        alert("Could not access microphone.");
       }
     }
   };
+
+  const toggleTTS = async (text, index) => {
+    // If clicking the same message that is playing, STOP it
+    if (playingMsgIndex === index) {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current.currentTime = 0;
+        currentAudioRef.current = null;
+      }
+      setPlayingMsgIndex(null);
+      return;
+    }
+
+    // Stop previous if any
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+
+    setPlayingMsgIndex(index);
+
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, language })
+      });
+
+      if (!res.ok) throw new Error("TTS Failed");
+
+      const audioBlob = await res.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audio.onended = () => {
+        setPlayingMsgIndex(null);
+        currentAudioRef.current = null;
+      };
+
+      currentAudioRef.current = audio;
+      audio.play();
+
+    } catch (err) {
+      console.error("TTS Error:", err);
+      alert("Failed to play audio.");
+      setPlayingMsgIndex(null);
+    }
+  };
+
 
   // 3. PERSIST ACTIVE ID IN HISTORY
   // This ensures that if we navigate away (e.g. to PDF) and come back, we know exactly which chat was active
@@ -536,6 +593,45 @@ const ChatInterface = () => {
                     })}
                   </div>
                 )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                  {msg.role === "assistant" && (
+                    <button
+                      onClick={() => toggleTTS(msg.content, i)}
+                      title={playingMsgIndex === i ? "Stop Reading" : "Read Aloud"}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        border: '1px solid ' + (playingMsgIndex === i ? '#ffe4e6' : '#e2e8f0'),
+                        backgroundColor: playingMsgIndex === i ? '#fff1f2' : '#f8fafc',
+                        color: playingMsgIndex === i ? '#be123c' : '#64748b',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = playingMsgIndex === i ? '#ffe4e6' : '#f1f5f9';
+                        e.currentTarget.style.color = playingMsgIndex === i ? '#be123c' : '#4f46e5';
+                        e.currentTarget.style.borderColor = playingMsgIndex === i ? '#fecdd3' : '#cbd5e1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = playingMsgIndex === i ? '#fff1f2' : '#f8fafc';
+                        e.currentTarget.style.color = playingMsgIndex === i ? '#be123c' : '#64748b';
+                        e.currentTarget.style.borderColor = playingMsgIndex === i ? '#ffe4e6' : '#e2e8f0';
+                      }}
+                    >
+                      {playingMsgIndex === i ? (
+                        <Square size={14} fill="currentColor" />
+                      ) : (
+                        <Volume2 size={16} />
+                      )}
+                    </button>
+                  )}
+                </div>
               </motion.div>
             ))}
 

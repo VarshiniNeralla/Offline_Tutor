@@ -30,6 +30,8 @@ import time
 
 warnings.filterwarnings('ignore')
 
+import threading
+
 class AITextbookTutorMultilingualBackendOffline:
     def __init__(self, language='telugu'):
         print(f"Initializing Offline AI Tutor ({language})...")
@@ -39,10 +41,11 @@ class AITextbookTutorMultilingualBackendOffline:
         self.model_name = "qwen2.5:1.5b" # Default offline model
         self.setup_embeddings_offline()
         self.check_llama_offline()
-        if self.language == 'telugu':
-            self.setup_telugu_asr_offline()
-        else:
-            self.asr_available = False
+        
+        # Setup ASR for both English and Telugu
+        self.setup_asr_offline()
+        
+        self.tts_lock = threading.Lock() # Lock for TTS
         self.setup_offline_tts()
         self.load_existing_data()
         print("Offline AI Tutor Ready!")
@@ -98,10 +101,10 @@ class AITextbookTutorMultilingualBackendOffline:
             print(f"Embeddings setup failed: {e}. RAG disabled.")
             self.embeddings = None
         
-    def setup_telugu_asr_offline(self):
-        """Setup Telugu speech recognition with detailed error reporting"""
+    def setup_asr_offline(self):
+        """Setup Speech Recognition (ASR) using faster-whisper"""
         try:
-            print("🎤 Starting Telugu speech recognition setup...")
+            print(f"🎤 Starting Speech Recognition setup for {self.language}...")
             
             # Check faster-whisper availability
             if WhisperModel is None:
@@ -111,13 +114,12 @@ class AITextbookTutorMultilingualBackendOffline:
                 return
             
             os.makedirs("./models/whisper", exist_ok=True)
-            print("✅ Models directory created")
             
             # Try standard models first for testing
-            print("🔄 Loading Whisper base model for testing...")
+            print("🔄 Loading Whisper base model...")
             try:
                 self.whisper_model = WhisperModel(
-                    "base",  # Use standard Whisper base model first
+                    "base",  # Use standard Whisper base model
                     device="cpu",
                     compute_type="int8",
                     download_root="./models/whisper"
@@ -125,10 +127,9 @@ class AITextbookTutorMultilingualBackendOffline:
                 self.asr_available = True
                 self.asr_error = None
                 print("✅ Whisper base model loaded successfully!")
-                print("💡 Telugu language will be detected automatically")
                 
             except Exception as base_error:
-                print(f"❌ Even base model failed: {base_error}")
+                print(f"❌ Whisper model load failed: {base_error}")
                 self.asr_available = False
                 self.asr_error = f"Model loading failed: {str(base_error)}"
                 
@@ -178,37 +179,40 @@ class AITextbookTutorMultilingualBackendOffline:
             self.tts_available = False
 
     def transcribe_audio(self, audio_file):
-        """Telugu transcription with script validation"""
+        """Multilingual transcription (STT)"""
         if not self.asr_available:
-            return "❌ Telugu speech recognition not available"
+            return f"❌ Speech recognition not available (Language: {self.language})"
         
         try:
-            print("🎤 Transcribing with script validation...")
+            print(f"🎤 Transcribing audio ({self.language})...")
             
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
                 tmp_file.write(audio_file.getvalue())
                 tmp_path = tmp_file.name
             
-            # Transcribe with Telugu language forced
+            # Map internal language to Whisper language code
+            lang_code = "te" if self.language == 'telugu' else "en"
+            
+            # Transcribe
             segments, info = self.whisper_model.transcribe(
                 tmp_path,
                 beam_size=5,
-                language="te",
+                language=lang_code,
                 task="transcribe",
                 temperature=0.0  # More deterministic
             )
             
             transcribed_text = " ".join([segment.text for segment in segments])
             print(f"✅ Transcribed: {transcribed_text[:100]}...")
-            # Validate if output contains Telugu script
-            has_telugu_script = any('\u0c00' <= char <= '\u0c7f' for char in transcribed_text)
             
-            if  not has_telugu_script:
-                print("⚠️ Detected Arabic script instead of Telugu!")
-                return "❌ Model error: Outputting Arabic script instead of Telugu. Please try again or check audio quality."
+            # Validate if output contains Telugu script ONLY if language is Telugu
+            if self.language == 'telugu':
+                has_telugu_script = any('\u0c00' <= char <= '\u0c7f' for char in transcribed_text)
+                if not has_telugu_script and transcribed_text.strip():
+                     print("⚠️ Validated: No Telugu characters found in output (might be mixed or error)")
+                     # For now, we allow it but log a warning, as it might be numbers/english words interspersed
             
             os.unlink(tmp_path)
-            print(f"✅ Transcribed: {transcribed_text[:50]}...")
             return transcribed_text
             
         except Exception as e:
@@ -407,34 +411,98 @@ Constraint: DO NOT REPEAT these ideas: {existing_topics}
             return '{"questions": []}', [], "truefalse"
 
     def speak_text(self, text: str):
-        """OFFLINE text-to-speech generation"""
-        if not self.tts_available:
+        """OFFLINE text-to-speech generation with thread-safe engine initialization"""
+        if pyttsx3 is None:
+            print("❌ pyttsx3 not installed")
             return None
         
-        try:
-            print("🔊 Generating speech offline...")
+        with self.tts_lock:
+            try:
+                print(f"🔊 Generating speech offline for: {text[:20]}...")
+                
+                # CRITICAL: Force reset of pyttsx3 singleton to respect thread affinity
+                # This ensures we get a fresh engine for the current thread
+                try:
+                    if hasattr(pyttsx3, '_engine'):
+                        del pyttsx3._engine
+                except Exception:
+                    pass
+
+                # Initialize engine locally (this will now create a NEW instance)
+                engine = pyttsx3.init()
+                
+                # Configure properties
+                engine.setProperty('rate', 150)
+                engine.setProperty('volume', 0.9)
+                
+                # Voice Selection Logic
+                voices = engine.getProperty('voices')
+                if voices:
+                    selected_voice = None
+                    for voice in voices:
+                        if self.language == 'telugu' and ('telugu' in voice.name.lower() or 'te' in voice.id.lower()):
+                            selected_voice = voice.id
+                            break
+                        elif self.language == 'english' and ('english' in voice.name.lower() or 'en' in voice.id.lower()):
+                            # Prefer US english if available
+                            if 'us' in voice.id.lower() or 'united states' in voice.name.lower():
+                                selected_voice = voice.id
+                                break
+                            selected_voice = voice.id
+                    
+                    if selected_voice:
+                        engine.setProperty('voice', selected_voice)
+                    elif voices:
+                        engine.setProperty('voice', voices[0].id)
+
+                # Create temporary audio file
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                    temp_path = tmp_file.name
+                
+                # Close the file handle so pyttsx3 can open it
+                tmp_file.close()
+                
+                # Generate speech offline
+                engine.save_to_file(text, temp_path)
+                engine.runAndWait()
+                
+                # Read generated audio
+                if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
+                    with open(temp_path, 'rb') as audio_file:
+                        audio_data = io.BytesIO(audio_file.read())
+                    print(f"✅ Speech generated offline! Size: {os.path.getsize(temp_path)}")
+                else:
+                    print("❌ TTS File was empty or not created")
+                    return None
+                
+                # Cleanup
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                
+                # Final cleanup of engine
+                if hasattr(engine, 'stop'):
+                    engine.stop()
+                try:
+                    del engine
+                except:
+                    pass
+                
+                # Reset global singleton again just to be safe
+                try:
+                    if hasattr(pyttsx3, '_engine'):
+                        del pyttsx3._engine
+                except Exception:
+                    pass
+                    
+                return audio_data
             
-            # Create temporary audio file
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
-                temp_path = tmp_file.name
-            
-            # Generate speech offline
-            self.tts_engine.save_to_file(text, temp_path)
-            self.tts_engine.runAndWait()
-            
-            # Read generated audio
-            with open(temp_path, 'rb') as audio_file:
-                audio_data = io.BytesIO(audio_file.read())
-            
-            # Cleanup
-            os.unlink(temp_path)
-            
-            print("✅ Speech generated offline!")
-            return audio_data
-        
-        except Exception as e:
-            print(f"❌ Offline TTS error: {e}")
-            return None
+            except Exception as e:
+                print(f"❌ Offline TTS error: {e}")
+                import traceback
+                traceback.print_exc()
+                return None
     
     def check_llama_offline(self):
         """Check local Ollama availability with memory-safe fallback order"""
