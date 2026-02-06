@@ -16,11 +16,13 @@ import json
 from tutor_backend_multilingual import AITextbookTutorMultilingualBackend
 from admin_backend import AITextbookAdminBackendOffline
 from progress_manager import ProgressManager
+from chat_manager import ChatManager
 
 # Global instances
 tutor_backend = None
 admin_backend = None
 progress_manager = ProgressManager()
+chat_manager = ChatManager()
 oral_review_queue = asyncio.Queue()
 
 @asynccontextmanager
@@ -160,6 +162,25 @@ async def get_stats():
     if not admin_backend:
         raise HTTPException(status_code=503, detail="System initializing")
     return admin_backend.get_system_stats()
+
+# --- Chat History Endpoints ---
+
+@app.get("/api/chats")
+async def get_all_chats():
+    return chat_manager.get_all_chats()
+
+@app.post("/api/chats/save")
+async def save_chat_endpoint(chat: Dict):
+    # Determine if it's a full list or single chat
+    # Frontend logic seems to handle individual chats better, but let's see.
+    # We'll support saving a single chat object.
+    chat_manager.sync_chat_state(chat)
+    return {"status": "success"}
+
+@app.delete("/api/chats/{chat_id}")
+async def delete_chat_endpoint(chat_id: str):
+    chat_manager.delete_chat(chat_id)
+    return {"status": "success"}
 
 @app.post("/api/upload")
 def upload_textbook(

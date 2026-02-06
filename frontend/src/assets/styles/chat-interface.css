@@ -337,6 +337,34 @@
   gap: 4px;
 }
 
+.source-citation-btn {
+  font-size: 0.7rem;
+  background: rgba(79, 70, 229, 0.05);
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(79, 70, 229, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.source-citation-btn:hover {
+  background: rgba(79, 70, 229, 0.1);
+  border-color: rgba(79, 70, 229, 0.3);
+  color: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
+}
+
+.source-citation-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
 /* INPUT SECTION */
 .chat-input {
   padding: 24px;

@@ -43,6 +43,9 @@ const MindMapTool = () => {
     const getSubtopicColor = (index) => COLORS[index % COLORS.length];
 
     // --- Persistence ---
+    const abortControllerRef = useRef(null);
+
+    // --- Persistence ---
     useEffect(() => {
         if (!bookId) return;
 
@@ -60,9 +63,22 @@ const MindMapTool = () => {
         } else {
             fetchMindMap();
         }
+
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [bookId]);
 
     const fetchMindMap = async (forceRegenerate = false) => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setLoading(true);
         setError(null);
 
@@ -76,7 +92,8 @@ const MindMapTool = () => {
                     book_ids: [bookId],
                     subjects: [subject || "General"],
                     language: language
-                })
+                }),
+                signal: controller.signal
             });
 
             const data = await response.json();
@@ -88,10 +105,14 @@ const MindMapTool = () => {
                 localStorage.setItem(`mindmap_v1_${bookId}`, JSON.stringify(data.response));
             }
         } catch (err) {
+            if (err.name === 'AbortError') return;
             setError(t.quiz.errorHeader || "Network error. Please check backend.");
         } finally {
-            setLoading(false);
-            setRegenerating(false);
+            if (abortControllerRef.current === controller) {
+                setLoading(false);
+                setRegenerating(false);
+                abortControllerRef.current = null;
+            }
         }
     };
 

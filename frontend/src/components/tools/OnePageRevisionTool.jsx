@@ -233,6 +233,8 @@ const OnePageRevisionTool = () => {
 
     const [statusMessage, setStatusMessage] = useState("Initializing...");
 
+    const abortControllerRef = useRef(null);
+
     useEffect(() => {
         if (!bookId) return;
         const cacheKey = `revision_v3_template_${bookId}`;
@@ -250,14 +252,26 @@ const OnePageRevisionTool = () => {
         } else {
             fetchRevision();
         }
+
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [bookId]);
 
     const fetchRevision = async (forceRegenerate = false) => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        // Create new controller for this request
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setLoading(true);
         setError(null);
         setStatusMessage("Connecting to AI Tutor...");
 
-        const controller = new AbortController();
         const timeoutId = setTimeout(() => {
             console.error("Frontend timeout reached (300s)");
             controller.abort();
@@ -298,16 +312,19 @@ const OnePageRevisionTool = () => {
                 }
             }
         } catch (err) {
-            console.error("Fetch error:", err);
             if (err.name === 'AbortError') {
-                setError("Request timed out. Please try again.");
-            } else {
-                setError(`Network error: ${err.message}`);
+                console.log("Request aborted");
+                return; // Do not set error for abort
             }
+            console.error("Fetch error:", err);
+            setError(`Network error: ${err.message}`);
         }
         finally {
-            setLoading(false);
-            setRegenerating(false);
+            if (abortControllerRef.current === controller) {
+                setLoading(false);
+                setRegenerating(false);
+                abortControllerRef.current = null;
+            }
         }
     };
 

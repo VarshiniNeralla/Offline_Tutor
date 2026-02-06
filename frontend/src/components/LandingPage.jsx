@@ -36,7 +36,7 @@ import heroImage from "../assets/images/Girl with laptop.svg";
 const LandingPage = () => {
   const navigate = useNavigate();
   const { language, toggleLanguage } = useLanguage();
-  const t = translations[language];
+  const t = translations[language] || translations['english'];
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const scrollTo = (id) => {

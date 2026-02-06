@@ -1,0 +1,62 @@
+[
+  {
+    "id": "1770390987557",
+    "title": "Chat Mode",
+    "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+    "bookName": "Oceans and Continents",
+    "subject": "Social",
+    "className": "Class 6",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "I'm ready to help with the **chat** tool for *Oceans and Continents*. What do you need?",
+        "sources": []
+      }
+    ],
+    "timestamp": "2026-02-06T15:16:27.558Z"
+  },
+  {
+    "id": "1770388939180",
+    "title": "Tell me about Islands Briefly",
+    "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+    "bookName": "Oceans and Continents",
+    "subject": "Social",
+    "className": "Class 6",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "I'm ready to help with the **chat** tool for *Oceans and Continents*. What do you need?",
+        "sources": []
+      },
+      {
+        "role": "user",
+        "content": "Tell me about Islands Briefly"
+      },
+      {
+        "role": "assistant",
+        "content": "Islands are landmasses that exist within bodies of water, specifically oceans or seas surrounded entirely by them. They come in various sizes but collectively account for a significant portion of Earth's surface area. While continents encompass most of the planet’s land, islands occupy many smaller regions and can be found on all seven continents except Antarctica. Greenland stands out as the largest island, surpassing even the combined land areas of 10 major Indian states. India itself has more than 1,300 small islands scattered among its two major groups: the Andaman and Nicobar Islands in the Bay of Bengal and the Lakshadweep Islands in the Arabian Sea.",
+        "sources": [
+          "Social - Page 10",
+          "Social - Page 12"
+        ]
+      }
+    ],
+    "timestamp": "2026-02-06T14:42:19.180Z"
+  },
+  {
+    "id": "1770388936383",
+    "title": "Chat Mode",
+    "bookId": "bdb1fde8-f1ea-4eff-9f12-ed2d4a2aaabc",
+    "bookName": "Locating Places on the Earth",
+    "subject": "Social",
+    "className": "Class 6",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "I'm ready to help with the **chat** tool for *Locating Places on the Earth*. What do you need?",
+        "sources": []
+      }
+    ],
+    "timestamp": "2026-02-06T14:42:16.383Z"
+  }
+]

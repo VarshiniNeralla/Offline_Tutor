@@ -19,6 +19,7 @@ import OralTestTool from './components/tools/OralTestTool';
 import MindMapTool from './components/tools/MindMapTool';
 import OnePageRevisionTool from './components/tools/OnePageRevisionTool';
 import MyProgress from './components/MyProgress';
+import PDFViewer from './components/PDFViewer';
 
 // Wrapper for AnimatePresence to work with Routes
 const AnimatedRoutes = () => {
@@ -40,6 +41,7 @@ const AnimatedRoutes = () => {
                 <Route path="/mindmap" element={<MindMapTool />} />
                 <Route path="/revision" element={<OnePageRevisionTool />} />
                 <Route path="/student/progress" element={<MyProgress />} />
+                <Route path="/pdf-viewer" element={<PDFViewer />} />
                 <Route path="/teacher" element={<AdminDashboard />} />
             </Routes>
         </AnimatePresence>
