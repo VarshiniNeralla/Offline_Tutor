@@ -2051,83 +2051,153 @@ OUTPUT ONLY THIS JSON FORMAT:
             }
 
     def generate_one_page_revision_response(self, book_id: str, language: str = 'en'):
-        """Generates a Single-Page Revision Sheet (English -> Translated)."""
+        """Generates a comprehensive Single-Page Revision Sheet using JSON format."""
         print(f"🧠 Generating Revision Sheet for book_id: {book_id}...")
-        
+
         try:
-            docs = self.vectorstore.similarity_search(f"summary case study for book {book_id}", k=12, filter={"book_id": book_id})
-            if not docs: return {"status": "error", "response": "No content."}, [], "revision"
-            context = "\n".join([d.page_content for d in docs])[:5000]
-            
-            # English Prompt
-            prompt = f"""### SYSTEM:
-Fill out this EXACT Revision Sheet Template in English.
-LESSON_TITLE: [Title]
-SOURCE: [Source]
-IMPORTANT_DATE: [Dates]
-BACKGROUND:
-- [Point 1]
-KEY_INFORMATION:
-- [Fact 1]
-EFFECTS:
-- [Effect 1]
-IMPORTANT_TERMS:
-- [Term 1] || [Definition 1]
-PRACTICE_QUESTIONS:
-- [Question 1]
+            # Better search: Get chapter title and main content
+            docs = self.vectorstore.similarity_search("chapter overview main topic introduction", k=20, filter={"book_id": book_id})
+            if not docs: return {"status": "error", "response": "No content found."}, [], "revision"
 
-Rules:
-- NO "Activity" questions.
-- Conceptual questions only.
-- Full sentences.
+            # Get book metadata for source
+            context = "\n\n".join([d.page_content for d in docs])[:4500]
+            book_source = docs[0].metadata.get('source', 'Textbook') if docs else 'Textbook'
 
-### CONTEXT:
-{context}
+            # Simplified prompt without unnecessary fields
+            prompt = f"""Create a revision sheet JSON from this textbook content. Follow this format:
 
-### FILLED TEMPLATE:"""
+{{
+  "topic": "Chapter Title From Content",
+  "why": [
+    "Context point 1",
+    "Context point 2",
+    "Context point 3"
+  ],
+  "facts": [
+    "Key fact 1",
+    "Key fact 2",
+    "Key fact 3",
+    "Key fact 4"
+  ],
+  "impacts": [
+    "Consequence 1",
+    "Consequence 2",
+    "Consequence 3"
+  ],
+  "keywords": ["Keyword1", "Keyword2", "Keyword3", "Keyword4"],
+  "definitions": [
+    "Definition of Keyword1",
+    "Definition of Keyword2",
+    "Definition of Keyword3",
+    "Definition of Keyword4"
+  ],
+  "exam_question": [
+    "Question 1?",
+    "Question 2?",
+    "Question 3?",
+    "Question 4?",
+    "Question 5?"
+  ]
+}}
 
-            response_text = self.call_llama_optimized(prompt, num_predict=3000, temperature=0.1)
-            
-            # Parse
-            revision_data = {"topic": "", "where": "", "when": "", "why": [], "facts": [], "impacts": [], "keywords": [], "definitions": [], "exam_question": []}
-            curr_sect = None
-            
-            for line in response_text.split('\n'):
-                line = line.strip()
-                if not line: continue
-                u_line = line.upper()
-                
-                if "LESSON_TITLE" in u_line: revision_data["topic"] = line.split(":", 1)[1].strip()
-                elif "SOURCE" in u_line: revision_data["where"] = line.split(":", 1)[1].strip()
-                elif "IMPORTANT_DATE" in u_line: revision_data["when"] = line.split(":", 1)[1].strip()
-                elif "BACKGROUND" in u_line: curr_sect = "why"
-                elif "KEY_INFORMATION" in u_line: curr_sect = "facts"
-                elif "EFFECTS" in u_line or "IMPACTS" in u_line: curr_sect = "impacts"
-                elif "IMPORTANT_TERMS" in u_line: curr_sect = "terms"
-                elif "PRACTICE_QUESTIONS" in u_line: curr_sect = "exam_question"
-                
-                elif curr_sect == "terms" and "||" in line:
-                    parts = line.lstrip("- ").split("||")
-                    if len(parts) == 2:
-                        revision_data["keywords"].append(parts[0].strip())
-                        revision_data["definitions"].append(parts[1].strip())
-                elif curr_sect and (line.startswith("-") or line.startswith("•")):
-                     content = line.lstrip("-• ").strip()
-                     if curr_sect == "exam_question" and len(revision_data["exam_question"]) < 5:
-                         revision_data["exam_question"].append(content)
-                     elif curr_sect in revision_data and isinstance(revision_data[curr_sect], list):
-                         revision_data[curr_sect].append(content)
-            
-            # Translate
-            if language == 'telugu' or self.language == 'telugu':
+CRITICAL INSTRUCTIONS:
+1. USE ONLY THE TEXTBOOK CONTENT PROVIDED BELOW.
+2. DO NOT COPY THE "WATER CYCLE" OR ANY EXAMPLE DATA.
+3. EXTRACT REAL DATA FROM THE TEXTBOOK CONTENT.
+4. "topic": Extract the actual Chapter Title.
+5. "why": 3-4 background points.
+6. "keywords": 4 REAL terms from the text.
+7. "definitions": Definitions must match the keywords.
+8. "exam_question": 5 conceptual questions based on the text.
+
+Textbook Content:
+{context[:4000]}
+
+JSON:"""
+
+            response_text = self.call_llama_optimized(prompt, num_predict=1500, temperature=0.4, format="json")
+            print(f"📝 Generated revision response ({len(response_text)} chars)")
+
+            # Parse JSON with error handling
+            try:
+                # Clean and extract JSON
+                response_text = response_text.strip()
+                if '{' in response_text:
+                    start = response_text.find('{')
+                    end = response_text.rfind('}') + 1
+                    response_text = response_text[start:end]
+
+                revision_data = json.loads(response_text)
+
+                # Remove unnecessary fields
+                revision_data.pop("when", None)
+                revision_data.pop("where", None)
+
+                # Validate and clean data - remove duplicates
+                def clean_list(items):
+                    """Remove duplicates while preserving order"""
+                    seen = set()
+                    cleaned = []
+                    for item in items:
+                        if item and item not in seen:
+                            seen.add(item)
+                            cleaned.append(item)
+                    return cleaned
+
+                # Clean all list fields
+                for field in ["why", "facts", "impacts", "keywords", "definitions", "exam_question"]:
+                    if field in revision_data and isinstance(revision_data[field], list):
+                        revision_data[field] = clean_list(revision_data[field])
+
+                # Ensure keywords and definitions match in count
+                if len(revision_data.get("keywords", [])) != len(revision_data.get("definitions", [])):
+                    min_len = min(len(revision_data.get("keywords", [])), len(revision_data.get("definitions", [])))
+                    revision_data["keywords"] = revision_data.get("keywords", [])[:min_len]
+                    revision_data["definitions"] = revision_data.get("definitions", [])[:min_len]
+
+                # Add fallback questions if insufficient
+                if len(revision_data.get("exam_question", [])) < 3:
+                    print("⚠️ Insufficient questions, generating fallback questions...")
+                    topic = revision_data.get("topic", "this topic")
+                    fallback_questions = [
+                        f"What are the main concepts covered in {topic}?",
+                        f"Explain the significance of {topic}.",
+                        f"What are the key facts about {topic}?",
+                        f"How does {topic} relate to the broader subject?",
+                        f"Why is {topic} important to understand?"
+                    ]
+                    existing_questions = revision_data.get("exam_question", [])
+                    needed = 5 - len(existing_questions)
+                    revision_data["exam_question"] = existing_questions + fallback_questions[:needed]
+
+                # Ensure minimum content in other sections
+                if not revision_data.get("why"):
+                    revision_data["why"] = ["Background information not available in source material"]
+                if not revision_data.get("facts"):
+                    revision_data["facts"] = ["Key facts not available in source material"]
+                if not revision_data.get("impacts"):
+                    revision_data["impacts"] = ["Impact information not available in source material"]
+
+                print(f"✅ Parsed revision sheet: {len(revision_data.get('facts', []))} facts, {len(revision_data.get('exam_question', []))} questions")
+
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON parsing failed: {e}")
+                print(f"📄 Response preview: {response_text[:500]}")
+                return {"status": "error", "response": "Failed to generate revision sheet. Please try again."}, [], "revision"
+
+            # Translate if needed
+            if language == 'telugu':
                 print("🔄 Translating Revision Sheet to Telugu...")
                 revision_data = self.translate_structure(revision_data, 'telugu')
+                print("✅ Translation complete")
 
             return revision_data, [], "revision"
-            
+
         except Exception as e:
             print(f"❌ Revision Error: {e}")
-            return {"status": "error", "response": str(e)}, [], "revision"
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "response": f"Error: {str(e)}"}, [], "revision"
 
     def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None, mode: str = None):
         """SMART response routing with book-level scoping and intent-based optimization."""

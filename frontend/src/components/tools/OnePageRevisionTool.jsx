@@ -80,9 +80,10 @@ const OnePageRevisionTool = () => {
         .rev-list {
             padding-left: 20px;
             margin: 5px 0;
+            line-height: 1.6;
         }
         .rev-list li {
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
         /* Keyword Table */
         .rev-kw-row {
@@ -236,9 +237,12 @@ const OnePageRevisionTool = () => {
 
     const abortControllerRef = useRef(null);
 
+    const isFetchingRef = useRef(false);
+
     useEffect(() => {
         if (!bookId) return;
-        const cacheKey = `revision_v3_template_${bookId}`;
+
+        const cacheKey = `revision_v3_template_${bookId}_${language}`;
         const cached = localStorage.getItem(cacheKey);
 
         if (cached) {
@@ -248,23 +252,33 @@ const OnePageRevisionTool = () => {
                 setLoading(false);
             } catch (e) {
                 console.error("Cache parse error", e);
-                fetchRevision();
+                // Only fetch if not already fetching
+                if (!isFetchingRef.current) {
+                    fetchRevision();
+                }
             }
         } else {
-            fetchRevision();
+            if (!isFetchingRef.current) {
+                fetchRevision();
+            }
         }
 
         return () => {
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
             }
+            // We don't reset isFetchingRef here because we might want to keep the lock until component unmounts fully or specific logic
+            isFetchingRef.current = false;
         };
-    }, [bookId]);
+    }, [bookId, language]);
 
     const fetchRevision = async (forceRegenerate = false) => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
+
+        isFetchingRef.current = true;
+
         // Create new controller for this request
         const controller = new AbortController();
         abortControllerRef.current = controller;
@@ -302,12 +316,19 @@ const OnePageRevisionTool = () => {
             const data = await response.json();
 
             if (data.status === "error" || (data.response && data.response.status === "error")) {
-                setError(data.response?.response || "Failed to generate.");
+                throw new Error(data.response?.response || "Failed to generate.");
             } else {
                 setStatusMessage("Rendering revision sheet...");
-                setRevisionData(data.response);
+
+                // Parse response if needed
+                let parsedData = data.response;
+                if (typeof parsedData === 'string') {
+                    try { parsedData = JSON.parse(parsedData); } catch (e) { }
+                }
+
+                setRevisionData(parsedData);
                 try {
-                    localStorage.setItem(`revision_v3_template_${bookId}`, JSON.stringify(data.response));
+                    localStorage.setItem(`revision_v3_template_${bookId}_${language}`, JSON.stringify(parsedData));
                 } catch (storeErr) {
                     console.warn("Could not cache response:", storeErr);
                 }
@@ -315,17 +336,20 @@ const OnePageRevisionTool = () => {
         } catch (err) {
             if (err.name === 'AbortError') {
                 console.log("Request aborted");
-                return; // Do not set error for abort
+                return;
             }
             console.error("Fetch error:", err);
             setError(`Network error: ${err.message}`);
         }
         finally {
+            // Only update state if this is still the active request
             if (abortControllerRef.current === controller) {
                 setLoading(false);
                 setRegenerating(false);
                 abortControllerRef.current = null;
             }
+            // Always release the fetch lock
+            isFetchingRef.current = false;
         }
     };
 
@@ -376,37 +400,20 @@ const OnePageRevisionTool = () => {
 
                 <h1 className="rev-header">{t.revision.caseStudy}: {revisionData.title || bookName}</h1>
 
-                {/* Topic Row */}
-                <div className="rev-grid" style={{ gridTemplateColumns: '1fr', borderTop: 'none' }}>
-                    <div className="rev-full-row" style={{ background: '#f9f9f9', borderTop: 'none' }}>
-                        <span className="rev-label inline">{t.revision.lessonTitle}: </span>
-                        <span>{revisionData.topic}</span>
+                {/* Main Grid: Background vs Key Info */}
+                <div className="rev-grid">
+                    {/* Left Col - Background */}
+                    <div className="rev-col">
+                        <span className="rev-label">{t.revision.background}</span>
+                        <ul className="rev-list" style={{ listStyleType: 'disc', marginTop: '8px' }}>
+                            {revisionData.why?.map((item, i) => <li key={i}>{item}</li>)}
+                        </ul>
                     </div>
-                    <div className="rev-full-row">
-                        <span className="rev-label inline">{t.revision.source}: </span>
-                        <span>{revisionData.where}</span>
-                    </div>
-                </div>
 
-                {/* Main Grid: When/Why vs Facts */}
-                <div className="rev-grid" style={{ borderTop: 'none' }}>
-                    {/* Left Col */}
+                    {/* Right Col - Key Info */}
                     <div className="rev-col">
-                        <div className="rev-border-bottom" style={{ paddingBottom: '8px', marginBottom: '8px' }}>
-                            <span className="rev-label inline">{t.revision.importantDate}: </span>
-                            <span>{revisionData.when}</span>
-                        </div>
-                        <div className="h-full">
-                            <span className="rev-label">{t.revision.background}</span>
-                            <ul className="rev-list" style={{ listStyleType: 'decimal' }}>
-                                {revisionData.why?.map((item, i) => <li key={i}>{item}</li>)}
-                            </ul>
-                        </div>
-                    </div>
-                    {/* Right Col */}
-                    <div className="rev-col">
-                        <div className="rev-border-bottom bg-gray-50" style={{ paddingBottom: '4px', marginBottom: '8px', fontWeight: 'bold' }}>{t.revision.keyInfo}</div>
-                        <ul className="rev-list" style={{ listStyleType: 'decimal' }}>
+                        <span className="rev-label">{t.revision.keyInfo}</span>
+                        <ul className="rev-list" style={{ listStyleType: 'disc', marginTop: '8px' }}>
                             {revisionData.facts?.map((item, i) => <li key={i}>{item}</li>)}
                         </ul>
                     </div>
@@ -416,40 +423,40 @@ const OnePageRevisionTool = () => {
                 <div className="rev-grid" style={{ borderTop: 'none' }}>
                     <div className="rev-col">
                         <span className="rev-label">{t.revision.effects}</span>
-                        <ul className="rev-list" style={{ listStyleType: 'disc' }}>
+                        <ul className="rev-list" style={{ listStyleType: 'disc', marginTop: '8px' }}>
                             {revisionData.impacts?.map((item, i) => <li key={i}>{item}</li>)}
                         </ul>
                     </div>
 
                     {/* Keywords Table */}
                     <div className="rev-col" style={{ padding: 0 }}>
-                        <div className="rev-kw-row" style={{ background: '#f0f0f0', fontWeight: 'bold' }}>
+                        <div className="rev-kw-row" style={{ background: '#f0f0f0', fontWeight: 'bold', fontSize: '14px' }}>
                             <div className="rev-kw-cell" style={{ borderRight: '1px solid #000' }}>{t.revision.terms}:</div>
                             <div className="rev-kw-cell">{t.revision.meanings}:</div>
                         </div>
-                        {/* Ensure exactly 5 rows to match look */}
+                        {/* Display keyword rows */}
                         {[...Array(5)].map((_, i) => {
                             const keyword = revisionData.keywords?.[i] || "";
                             const def = revisionData.definitions?.[i] || "";
                             return (
                                 <div key={i} className="rev-kw-row">
-                                    <div className="rev-kw-cell">{keyword}</div>
-                                    <div className="rev-kw-cell" style={{ fontSize: '11px' }}>{def}</div>
+                                    <div className="rev-kw-cell" style={{ fontWeight: '500' }}>{keyword}</div>
+                                    <div className="rev-kw-cell" style={{ fontSize: '12px', lineHeight: '1.4' }}>{def}</div>
                                 </div>
                             )
                         })}
                     </div>
                 </div>
 
-                {/* Exam Question */}
+                {/* Practice Questions */}
                 <div className="rev-full-row" style={{ borderLeft: '2px solid #000', borderRight: '2px solid #000', borderBottom: '2px solid #000' }}>
                     <span className="rev-label">{t.revision.practiceQuestions}:</span>
                     {Array.isArray(revisionData.exam_question) ? (
-                        <ul className="rev-list" style={{ listStyleType: 'decimal', fontStyle: 'italic' }}>
+                        <ul className="rev-list" style={{ listStyleType: 'decimal', marginTop: '8px', lineHeight: '1.6' }}>
                             {revisionData.exam_question.map((q, i) => <li key={i}>{q}</li>)}
                         </ul>
                     ) : (
-                        <p style={{ fontStyle: 'italic', marginTop: '4px' }}>{revisionData.exam_question}</p>
+                        <p style={{ marginTop: '8px', lineHeight: '1.6' }}>{revisionData.exam_question}</p>
                     )}
                 </div>
 
