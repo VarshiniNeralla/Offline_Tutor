@@ -57,7 +57,14 @@ const ChatInterface = () => {
 
   // Load from Backend on Mount & Sync
   useEffect(() => {
-    fetch('/api/chats')
+    const currentStudent = localStorage.getItem("studentName");
+    // If no student, maybe default to empty or fetch generic? 
+    // Ideally we wait for auth. But let's fetch with query param if present.
+    const url = currentStudent
+      ? `/api/chats?student_name=${encodeURIComponent(currentStudent)}`
+      : '/api/chats';
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -95,14 +102,15 @@ const ChatInterface = () => {
         mediaRecorder.onstop = async () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
-          // Send to Backend
+          // CRITICAL: Save current input BEFORE any async operations
+          const savedInput = input;
+
+          // Send to Backend with language parameter
           const formData = new FormData();
           formData.append("file", audioBlob, "recording.webm");
+          formData.append("language", language);
 
           try {
-            // Show temporary loading indicator in input?
-            setInput("Transcribing...");
-
             const res = await fetch("/api/transcribe", {
               method: "POST",
               body: formData
@@ -111,12 +119,16 @@ const ChatInterface = () => {
             if (!res.ok) throw new Error("Transcription failed");
 
             const data = await res.json();
-            setInput(data.text || "");
+
+            // Append to the saved input value (not current state which may have changed)
+            const space = savedInput.trim() ? " " : "";
+            setInput(savedInput + space + (data.text || ""));
 
           } catch (err) {
             console.error("STT Error:", err);
             alert("Failed to transcribe audio. Please try again.");
-            setInput("");
+            // Don't clear input - keep what user had
+            setInput(savedInput);
           } finally {
             // Stop all tracks to release mic
             stream.getTracks().forEach(track => track.stop());
@@ -318,6 +330,7 @@ const ChatInterface = () => {
       bookName: targetBName,
       subject: targetSub,
       className: targetCls,
+      studentName: localStorage.getItem("studentName"), // Store User Identity
       messages: [
         {
           role: "assistant",
@@ -445,11 +458,16 @@ const ChatInterface = () => {
     <div className="chat-layout">
       <style>{`
             .waveform-box {
+                flex: 1;
                 display: flex;
                 align-items: center;
-                gap: 3px;
-                padding: 0 10px;
-                height: 24px;
+                gap: 5px;
+                padding: 0 16px;
+                height: 42px;
+                background: #f1f5f9;
+                border-radius: 12px;
+                color: #4f46e5;
+                font-weight: 600;
             }
             .wave-bar {
                 width: 3px;
@@ -662,21 +680,22 @@ const ChatInterface = () => {
               <Mic size={20} />
             </button>
 
-            <input
-              placeholder={currentChat ? t.chat.placeholder : t.dashboard.selectSubject}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              disabled={!activeChatId}
-            />
-
-            {listening && (
+            {!listening ? (
+              <input
+                placeholder={currentChat ? t.chat.placeholder : t.dashboard.selectSubject}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                disabled={!activeChatId}
+              />
+            ) : (
               <div className="waveform-box">
                 <div className="wave-bar"></div>
                 <div className="wave-bar"></div>
                 <div className="wave-bar"></div>
                 <div className="wave-bar"></div>
                 <div className="wave-bar"></div>
+                <span style={{ marginLeft: '10px', fontSize: '0.9rem' }}>Listening...</span>
               </div>
             )}
 

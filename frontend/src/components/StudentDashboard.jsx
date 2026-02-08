@@ -32,7 +32,7 @@ import "../assets/styles/student-dashboard.css";
 
 const StudentDashboard = () => {
     const navigate = useNavigate();
-    const { language, toggleLanguage } = useLanguage();
+    const { language, setLanguage, toggleLanguage } = useLanguage();
     const t = translations[language];
 
     const getClassDisplay = (cls) => {
@@ -119,7 +119,9 @@ const StudentDashboard = () => {
     };
 
     const logout = () => {
+        setLanguage('english');
         localStorage.clear();
+        sessionStorage.clear();
         navigate("/");
     };
 
@@ -135,10 +137,7 @@ const StudentDashboard = () => {
                         </div>
                     </div>
                     <div className="header-actions">
-                        <button className="lang-toggle-btn" onClick={toggleLanguage} style={{ background: 'white', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '12px', cursor: 'pointer' }}>
-                            <Languages size={18} />
-                            <span>{language === 'english' ? 'తెలుగు' : 'English'}</span>
-                        </button>
+
                         <button onClick={() => navigate("/student/progress")} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', borderColor: 'var(--primary-light)' }}>
                             <History size={18} /> {t.dashboard.progress}
                         </button>

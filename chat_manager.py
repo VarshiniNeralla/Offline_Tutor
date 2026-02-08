@@ -25,9 +25,26 @@ class ChatManager:
         except Exception as e:
             print(f"❌ Failed to save chats: {e}")
 
-    def get_all_chats(self) -> List[Dict]:
-        # reloading just in case of external edits, though for single user app it's fine
-        return self.chats
+    def get_all_chats(self, student_name: Optional[str] = None) -> List[Dict]:
+        if not student_name:
+            return self.chats
+        
+        # Filter by student name (case-insensitive for safety)
+        filtered = []
+        target_name = student_name.strip().lower()
+        
+        for chat in self.chats:
+            # Check if chat has owner
+            owner = chat.get("studentName", "").strip().lower()
+            if owner == target_name:
+                filtered.append(chat)
+            # Optional: Decide if we want to show 'legacy' chats (no owner) to everyone or no one.
+            # For privacy, better to show only owned chats if a name is requested.
+            # If a chat has no 'studentName', it might be from before this feature.
+            # We could assign them to the first user or just hide them.
+            # Let's hide them from specific user queries to be safe.
+            
+        return filtered
 
     def get_chat(self, chat_id: str) -> Optional[Dict]:
         for chat in self.chats:

@@ -6,9 +6,11 @@ sentence-transformers
 langdetect
 requests
 faster-whisper
+openai-whisper
 torch
 pyttsx3
 pypdf
 fastapi
 uvicorn
 python-multipart
+deep-translator

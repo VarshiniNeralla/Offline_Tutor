@@ -26,8 +26,7 @@ import {
   MonitorPlay,
   Search,
   Menu,
-  X,
-  Languages
+  X
 } from "lucide-react";
 
 // Assets
@@ -35,9 +34,23 @@ import heroImage from "../assets/images/Girl with laptop.svg";
 
 const LandingPage = () => {
   const navigate = useNavigate();
-  const { language, toggleLanguage } = useLanguage();
+  const { language } = useLanguage();
   const t = translations[language] || translations['english'];
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Handlers to enforce language selection if not logged in
+  const handleStudentAccess = () => {
+    const isLoggedIn = localStorage.getItem('studentName') && localStorage.getItem('studentClass');
+    if (!isLoggedIn) {
+      sessionStorage.removeItem('languageSelected');
+    }
+    navigate('/student/login');
+  };
+
+  const handleTeacherAccess = () => {
+    sessionStorage.removeItem('languageSelected');
+    navigate('/teacher');
+  };
 
   const scrollTo = (id) => {
     setMobileMenuOpen(false); // Close menu on click
@@ -64,12 +77,7 @@ const LandingPage = () => {
             <a href="#offline" onClick={(e) => { e.preventDefault(); scrollTo('offline'); }}>{t.nav.features}</a>
             <a href="#tools" onClick={(e) => { e.preventDefault(); scrollTo('tools'); }}>{t.nav.tools}</a>
 
-            <button className="lang-toggle-btn" onClick={toggleLanguage} title={language === 'english' ? 'Telugu లోకి మారండి' : 'Switch to English'}>
-              <Languages size={18} />
-              <span>{language === 'english' ? 'తెలుగు' : 'English'}</span>
-            </button>
-
-            <button className="nav-cta" onClick={() => navigate('/student/login')}>{t.nav.getStarted}</button>
+            <button className="nav-cta" onClick={handleStudentAccess}>{t.nav.getStarted}</button>
           </div>
 
           {/* Mobile Hamburger */}
@@ -92,12 +100,7 @@ const LandingPage = () => {
             <a href="#offline" onClick={(e) => { e.preventDefault(); scrollTo('offline'); }}>{t.nav.features}</a>
             <a href="#tools" onClick={(e) => { e.preventDefault(); scrollTo('tools'); }}>{t.nav.tools}</a>
 
-            <button className="lang-toggle-btn-mobile" onClick={toggleLanguage}>
-              <Languages size={20} />
-              <span>{language === 'english' ? 'తెలుగు' : 'English'}</span>
-            </button>
-
-            <button className="nav-cta mobile-cta" onClick={() => navigate('/student/login')}>{t.nav.getStarted}</button>
+            <button className="nav-cta mobile-cta" onClick={handleStudentAccess}>{t.nav.getStarted}</button>
           </div>
         </div>
       )}
@@ -108,7 +111,7 @@ const LandingPage = () => {
           <div className="hero-text">
             <h1>{t.hero.title}</h1>
             <p>{t.hero.subtitle}</p>
-            <button className="btn-primary" onClick={() => navigate('/student/login')}>
+            <button className="btn-primary" onClick={handleStudentAccess}>
               {t.hero.cta} <ArrowRight size={20} />
             </button>
           </div>
@@ -134,7 +137,7 @@ const LandingPage = () => {
                   <li key={i}><CheckCircle2 size={18} /> {f}</li>
                 ))}
               </ul>
-              <button className="btn-primary" onClick={() => navigate('/student/login')}>{t.roles.exploreStudents}</button>
+              <button className="btn-primary" onClick={handleStudentAccess}>{t.roles.exploreStudents}</button>
             </div>
 
             <div className="role-v2-card teacher">
@@ -144,7 +147,7 @@ const LandingPage = () => {
                   <li key={i}><CheckCircle2 size={18} /> {f}</li>
                 ))}
               </ul>
-              <button className="btn-secondary" onClick={() => navigate('/teacher')}>{t.roles.manageLibrary}</button>
+              <button className="btn-secondary" onClick={handleTeacherAccess}>{t.roles.manageLibrary}</button>
             </div>
           </div>
         </div>
@@ -257,7 +260,7 @@ const LandingPage = () => {
               <p>&copy; {new Date().getFullYear()} {t.footer.brand}</p>
             </div>
             <div className="footer-links-simple">
-              <a href="/teacher" onClick={(e) => { e.preventDefault(); navigate('/teacher'); }}>{t.footer.teacherLogin}</a>
+              <a href="/teacher" onClick={(e) => { e.preventDefault(); handleTeacherAccess(); }}>{t.footer.teacherLogin}</a>
               <span className="divider">|</span>
               <a href="#tools" onClick={(e) => { e.preventDefault(); scrollTo('tools'); }}>{t.nav.tools}</a>
               <span className="divider">|</span>

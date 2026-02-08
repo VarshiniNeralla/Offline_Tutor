@@ -132,11 +132,21 @@ def chat(request: ChatRequest):
         raise HTTPException(status_code=503, detail="System initializing")
     
     try:
+        # Map language codes to full names for backend compatibility
+        language_map = {
+            'en': 'english',
+            'te': 'telugu',
+            'hi': 'hindi',
+            'ta': 'tamil',
+            'kn': 'kannada'
+        }
+        backend_language = language_map.get(request.language, request.language)
+
         # Switch language if needed (this might need optimization to avoid reloading heavy models)
-        if hasattr(tutor_backend, 'language') and tutor_backend.language != request.language:
-            print(f"🔄 Switching language to {request.language}")
-            tutor_backend.language = request.language
-            if request.language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
+        if hasattr(tutor_backend, 'language') and tutor_backend.language != backend_language:
+            print(f"🔄 Switching language to {backend_language}")
+            tutor_backend.language = backend_language
+            if backend_language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
                  tutor_backend.setup_telugu_asr_offline()
             tutor_backend.setup_offline_tts()
 
@@ -167,24 +177,42 @@ async def get_stats():
     return admin_backend.get_system_stats()
 
 @app.post("/api/transcribe")
-async def transcribe_generated_audio(file: UploadFile = File(...)):
-    """Generic endpoint for transcribing audio (STT)"""
+async def transcribe_generated_audio(file: UploadFile = File(...), language: str = Form(default='english')):
+    """Generic endpoint for transcribing audio (STT) with language support"""
     if not tutor_backend:
         raise HTTPException(status_code=503, detail="System initializing")
-    
+
     try:
+        # Map language codes to full names for backend compatibility
+        language_map = {
+            'en': 'english',
+            'te': 'telugu',
+            'hi': 'hindi',
+            'ta': 'tamil',
+            'kn': 'kannada'
+        }
+        backend_language = language_map.get(language, language)
+
+        # Switch language if needed
+        if hasattr(tutor_backend, 'language') and tutor_backend.language != backend_language:
+            print(f"🔄 Switching transcription language to {backend_language}")
+            tutor_backend.language = backend_language
+            # Re-setup ASR if Telugu is selected and not already set up
+            if backend_language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
+                tutor_backend.setup_asr_offline()
+
         # Read file into BytesIO
         audio_content = await file.read()
         import io
         audio_file = io.BytesIO(audio_content)
-        
+
         # Transcribe
         text = tutor_backend.transcribe_audio(audio_file)
-        
+
         # Check for error prefixes from backend
         if text.startswith("❌"):
              raise HTTPException(status_code=500, detail=text)
-             
+
         return {"text": text}
     except Exception as e:
         print(f"❌ Transcription failed: {e}")
@@ -220,8 +248,9 @@ def text_to_speech(request: TTSRequest):
 # --- Chat History Endpoints ---
 
 @app.get("/api/chats")
-async def get_all_chats():
-    return chat_manager.get_all_chats()
+async def get_all_chats(student_name: Optional[str] = None):
+    # Pass the student name filter to the manager
+    return chat_manager.get_all_chats(student_name)
 
 @app.post("/api/chats/save")
 async def save_chat_endpoint(chat: Dict):
@@ -338,16 +367,26 @@ async def get_progress_history(name: str, student_class: str):
 @app.post("/api/oral_test/start")
 async def start_oral_test(request: OralTestStartRequest):
     print(f"🎙️ Starting {request.mode} Oral Test for {request.student_name}...")
-    
+
     if not tutor_backend:
         raise HTTPException(status_code=503, detail="System initializing")
-        
+
     try:
+        # Map language codes to full names for backend compatibility
+        language_map = {
+            'en': 'english',
+            'te': 'telugu',
+            'hi': 'hindi',
+            'ta': 'tamil',
+            'kn': 'kannada'
+        }
+        backend_language = language_map.get(request.language, request.language)
+
         # Switch language if needed
-        if tutor_backend.language != request.language:
-            print(f"🔄 Switching language for Oral Test to {request.language}")
-            tutor_backend.language = request.language
-            if request.language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
+        if tutor_backend.language != backend_language:
+            print(f"🔄 Switching language for Oral Test to {backend_language}")
+            tutor_backend.language = backend_language
+            if backend_language == 'telugu' and not hasattr(tutor_backend, 'whisper_model'):
                  tutor_backend.setup_telugu_asr_offline()
             tutor_backend.setup_offline_tts()
 

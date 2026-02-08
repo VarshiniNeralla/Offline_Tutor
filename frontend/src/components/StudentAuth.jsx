@@ -4,19 +4,30 @@ import { motion } from 'framer-motion';
 import { useLanguage } from '../context/LanguageContext';
 import { translations } from '../translations';
 import { User, ChevronRight, GraduationCap } from 'lucide-react';
+import LanguageSelectionModal from './LanguageSelectionModal';
 
 const StudentAuth = () => {
     const navigate = useNavigate();
-    const { language } = useLanguage();
+    const { language, setLanguage } = useLanguage();
     const t = translations[language];
     const [name, setName] = useState('');
     const [selectedClass, setSelectedClass] = useState('Class 10');
+    const [showLanguageModal, setShowLanguageModal] = useState(false);
+    const [languageSelected, setLanguageSelected] = useState(false);
 
     useEffect(() => {
         const savedName = localStorage.getItem('studentName');
         const savedClass = localStorage.getItem('studentClass');
         if (savedName && savedClass) {
             navigate('/student/dashboard');
+        } else {
+            // Check if user has already selected a language in this session
+            const sessionLanguageSelected = sessionStorage.getItem('languageSelected');
+            if (!sessionLanguageSelected) {
+                setShowLanguageModal(true);
+            } else {
+                setLanguageSelected(true);
+            }
         }
     }, [navigate]);
 
@@ -35,7 +46,23 @@ const StudentAuth = () => {
         return num ? `తరగతి ${num[0]}` : cls;
     };
 
+    const handleLanguageSelect = (selectedLang) => {
+        setLanguage(selectedLang);
+        setLanguageSelected(true);
+        sessionStorage.setItem('languageSelected', 'true');
+    };
+
     return (
+        <>
+            <LanguageSelectionModal
+                isOpen={showLanguageModal}
+                onClose={() => {
+                    setShowLanguageModal(false);
+                    setLanguageSelected(true);
+                    sessionStorage.setItem('languageSelected', 'true');
+                }}
+                onSelectLanguage={handleLanguageSelect}
+            />
         <div className="student-auth-root">
             {/* Background Layer */}
             <div className="student-auth-bg"></div>
@@ -98,6 +125,7 @@ const StudentAuth = () => {
                 </div>
             </motion.div>
         </div>
+        </>
     );
 };
 

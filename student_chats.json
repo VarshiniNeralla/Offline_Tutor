@@ -1,11 +1,12 @@
 [
   {
-    "id": "1770397302377",
+    "id": "1770556419211",
     "title": "Chat Mode",
     "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
     "bookName": "Oceans and Continents",
     "subject": "Social",
     "className": "Class 6",
+    "studentName": "Priya",
     "messages": [
       {
         "role": "assistant",
@@ -13,10 +14,39 @@
         "sources": []
       }
     ],
-    "timestamp": "2026-02-06T17:01:42.377Z"
+    "timestamp": "2026-02-08T13:13:39.211Z"
   },
   {
-    "id": "1770390987557",
+    "id": "1770555953408",
+    "title": "Today I want to learn about...",
+    "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+    "bookName": "Oceans and Continents",
+    "subject": "Social",
+    "className": "Class 6",
+    "studentName": "Nisha",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "I'm ready to help with the **chat** tool for *Oceans and Continents*. What do you need?",
+        "sources": []
+      },
+      {
+        "role": "user",
+        "content": "Today I want to learn about islands briefly"
+      },
+      {
+        "role": "assistant",
+        "content": "Today's learning will focus on islands, which are smaller landmasses that form part of continents and oceans. Islands vary greatly in size from Greenland, the largest island globally, to India with over 1,300 small islands including Andaman and Nicobar and Lakshadweep.\n\nGreenland is so big compared to other continents that if you added up the areas of all ten largest Indian states, it would still be smaller. Islands are surrounded by water but because they're not as large as continents, they're classified differently.",
+        "sources": [
+          "Social - Page 12",
+          "Social - Page 10"
+        ]
+      }
+    ],
+    "timestamp": "2026-02-08T13:05:53.408Z"
+  },
+  {
+    "id": "1770555647443",
     "title": "Chat Mode",
     "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
     "bookName": "Oceans and Continents",
@@ -29,7 +59,79 @@
         "sources": []
       }
     ],
-    "timestamp": "2026-02-06T15:16:27.558Z"
+    "timestamp": "2026-02-08T13:00:47.443Z"
+  },
+  {
+    "id": "1770458166916",
+    "title": "Chat Mode",
+    "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+    "bookName": "Oceans and Continents",
+    "subject": "Social",
+    "className": "Class 6",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "నేను *Oceans and Continents* కోసం **chat** సాధనంతో సహాయం చేయడానికి సిద్ధంగా ఉన్నాను. మీకు ఏమి కావాలి?",
+        "sources": []
+      }
+    ],
+    "timestamp": "2026-02-07T09:56:06.916Z"
+  },
+  {
+    "id": "1770456682937",
+    "title": "Chat Mode",
+    "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+    "bookName": "Oceans and Continents",
+    "subject": "Social",
+    "className": "Class 6",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "నేను *Oceans and Continents* కోసం **chat** సాధనంతో సహాయం చేయడానికి సిద్ధంగా ఉన్నాను. మీకు ఏమి కావాలి?",
+        "sources": []
+      }
+    ],
+    "timestamp": "2026-02-07T09:31:22.937Z"
+  },
+  {
+    "id": "1770453666729",
+    "title": "భారతదేశం చుట్టూ ఉన్న ద్వీపా...",
+    "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+    "bookName": "Oceans and Continents",
+    "subject": "Social",
+    "className": "Class 6",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "నేను *Oceans and Continents* కోసం **chat** సాధనంతో సహాయం చేయడానికి సిద్ధంగా ఉన్నాను. మీకు ఏమి కావాలి?",
+        "sources": []
+      },
+      {
+        "role": "user",
+        "content": "భారతదేశం చుట్టూ ఉన్న ద్వీపాలు ఏమిటి?"
+      },
+      {
+        "role": "assistant",
+        "content": "భారతదేశం చుట్టూ ఉన్న దీవులలో శ్రీలంక మరియు అండమాన్ నికోబార్ దీవులు ఉన్నాయి.\n\n- శ్రీలంక: ఇది భారతదేశానికి పశ్చిమాన ఉంది మరియు హిందూ మహాసముద్రంలో ఒక ద్వీప దేశం.\n- అండమాన్ మరియు నికోబార్ దీవులు: ఇవి భారతదేశ తూర్పు తీరంలో ఉన్న దీవుల గొలుసు. అవి భారత ఉపఖండంలో భాగంగా ఉన్నాయి కానీ పూర్తి స్థాయి దేశాలుగా పరిగణించబడవు.\n\nఈ ద్వీపాలు వాటి సామీప్యత మరియు చారిత్రక ప్రభావాల కారణంగా భారతదేశానికి గణనీయమైన సాంస్కృతిక, ఆర్థిక మరియు వ్యూహాత్మక ప్రాముఖ్యతను అందిస్తాయి.",
+        "sources": [
+          "Social - పేజీ 3",
+          "Social - పేజీ 13"
+        ]
+      },
+      {
+        "role": "user",
+        "content": "సముద్రాలు మన భూమిపై ఎలాంటి ప్రభావం చూపిస్తాయి? వాతావరణం, జీవ వైవిధ్యం మరియు మానవ జీవనంపై సముద్రాల ప్రభావాన్ని సంక్షిప్తంగా వివరించగలవా?"
+      },
+      {
+        "role": "assistant",
+        "content": "మహాసముద్రాలు మన భూమిపై అనేక విధాలుగా తీవ్ర ప్రభావాన్ని చూపుతాయి:\n\n1. వాతావరణం: వాతావరణం నుండి పెద్ద మొత్తంలో కార్బన్ డయాక్సైడ్‌ను గ్రహించి నిల్వ చేయడం ద్వారా భూమి యొక్క వాతావరణాన్ని నియంత్రించడంలో సముద్రం కీలక పాత్ర పోషిస్తుంది. ఇది సముద్ర ఉపరితలం మరియు భూమి మధ్య ఉష్ణ బదిలీ ద్వారా ఉష్ణోగ్రతను కూడా నియంత్రిస్తుంది.\n\n2. జీవవైవిధ్యం: సముద్రం లక్షలాది జాతులకు నిలయంగా ఉంది, భూమిపై మరెక్కడా లేని అనేక జాతులు ఉన్నాయి. ఇది 90% పైగా సముద్ర జీవులకు ఆవాసాలను అందిస్తుంది మరియు ప్రపంచ ప్రాథమిక ఉత్పాదకతలో 80%కి మద్దతు ఇస్తుంది.\n\n3. మానవ జీవితం: మానవ మనుగడకు అవసరమైన వనరులను సముద్రాలు అందిస్తాయి. అవి ఆహారం (ఫిషింగ్ ద్వారా), శక్తి (ఇంధనం మరియు పవర్ ప్లాంట్లుగా), ఖనిజాలు, ఔషధం మరియు రవాణా యొక్క ముఖ్యమైన వనరులు. సముద్రం మన ఆర్థిక వ్యవస్థను పర్యాటకం, షిప్పింగ్ మరియు దానిపై ఆధారపడిన ఇతర పరిశ్రమల ద్వారా కూడా ప్రభావితం చేస్తుంది.",
+        "sources": [
+          "Social - పేజీ 13",
+          "Social - పేజీ 3"
+        ]
+      }
+    ],
+    "timestamp": "2026-02-07T08:41:06.729Z"
   },
   {
     "id": "1770388939180",

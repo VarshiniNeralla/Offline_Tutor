@@ -10,13 +10,13 @@ except ImportError:
 from langchain_community.vectorstores import Chroma
 import requests
 
-# from faster_whisper import WhisperModel
-import torch
-# OFFLINE TTS instead of gTTS
+# Whisper for ASR - using OpenAI Whisper (best Telugu script accuracy)
 try:
-    from faster_whisper import WhisperModel
+    import whisper  # OpenAI Whisper with GPU support
+    WHISPER_AVAILABLE = True
 except ImportError:
-    WhisperModel = None
+    WHISPER_AVAILABLE = False
+    whisper = None
 import torch
 try:
     import pyttsx3
@@ -27,6 +27,13 @@ import io
 import re
 import time
 
+# Translation support for Telugu
+try:
+    from deep_translator import GoogleTranslator
+    TRANSLATOR_AVAILABLE = True
+except ImportError:
+    TRANSLATOR_AVAILABLE = False
+    GoogleTranslator = None
 
 warnings.filterwarnings('ignore')
 
@@ -102,37 +109,36 @@ class AITextbookTutorMultilingualBackendOffline:
             self.embeddings = None
         
     def setup_asr_offline(self):
-        """Setup Speech Recognition (ASR) using faster-whisper"""
+        """Setup Speech Recognition (ASR) using OpenAI Whisper with GPU support"""
         try:
-            print(f"🎤 Starting Speech Recognition setup for {self.language}...")
-            
-            # Check faster-whisper availability
-            if WhisperModel is None:
-                print("❌ faster-whisper not installed. Run: pip install faster-whisper")
-                self.asr_available = False
-                self.asr_error = "faster-whisper not installed"
-                return
-            
-            os.makedirs("./models/whisper", exist_ok=True)
-            
-            # Try standard models first for testing
-            print("🔄 Loading Whisper base model...")
+            print(f"🎤 Starting Speech Recognition setup with OpenAI Whisper...")
+
+            # Try to import OpenAI Whisper
             try:
-                self.whisper_model = WhisperModel(
-                    "base",  # Use standard Whisper base model
-                    device="cpu",
-                    compute_type="int8",
-                    download_root="./models/whisper"
-                )
-                self.asr_available = True
-                self.asr_error = None
-                print("✅ Whisper base model loaded successfully!")
-                
-            except Exception as base_error:
-                print(f"❌ Whisper model load failed: {base_error}")
+                import whisper
+                self.whisper_lib = whisper
+                print("✅ OpenAI Whisper library available")
+            except ImportError:
+                print("❌ openai-whisper not installed. Run: pip install openai-whisper")
                 self.asr_available = False
-                self.asr_error = f"Model loading failed: {str(base_error)}"
-                
+                self.asr_error = "openai-whisper not installed"
+                return
+
+            # Check GPU availability
+            import torch
+            self.has_cuda = torch.cuda.is_available()
+            if self.has_cuda:
+                print("🚀 GPU (CUDA) detected! Transcription will be much faster.")
+            else:
+                print("💻 Using CPU. Transcription will be slower but accurate.")
+
+            # Set model name (will be loaded on first transcription)
+            self.whisper_model_name = "large"
+            self.whisper_model = None  # Lazy load on first use
+            self.asr_available = True
+            self.asr_error = None
+            print(f"✅ ASR Ready! Will use '{self.whisper_model_name}' model")
+
         except Exception as e:
             print(f"❌ ASR setup completely failed: {e}")
             self.asr_available = False
@@ -179,52 +185,138 @@ class AITextbookTutorMultilingualBackendOffline:
             self.tts_available = False
 
     def transcribe_audio(self, audio_file):
-        """Multilingual transcription (STT)"""
+        """Multilingual transcription (STT) using OpenAI Whisper with GPU support"""
         if not self.asr_available:
             return f"❌ Speech recognition not available (Language: {self.language})"
-        
+
         try:
-            print(f"🎤 Transcribing audio ({self.language})...")
-            
+            gpu_status = "GPU" if self.has_cuda else "CPU"
+            print(f"🎤 Transcribing audio ({self.language}) with OpenAI Whisper ({gpu_status})...")
+
+            # Save audio to temp file
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
                 tmp_file.write(audio_file.getvalue())
                 tmp_path = tmp_file.name
-            
-            # Map internal language to Whisper language code
-            lang_code = "te" if self.language == 'telugu' else "en"
-            
-            # Transcribe
-            segments, info = self.whisper_model.transcribe(
-                tmp_path,
-                beam_size=5,
-                language=lang_code,
-                task="transcribe",
-                temperature=0.0  # More deterministic
-            )
-            
-            transcribed_text = " ".join([segment.text for segment in segments])
-            print(f"✅ Transcribed: {transcribed_text[:100]}...")
-            
-            # Validate if output contains Telugu script ONLY if language is Telugu
+
+            # Load model if not already loaded (lazy loading)
+            if self.whisper_model is None:
+                model_name = getattr(self, 'whisper_model_name', 'large')
+                print(f"🔄 Loading OpenAI Whisper {model_name} model...")
+                self.whisper_model = self.whisper_lib.load_model(model_name)
+                print(f"✅ OpenAI Whisper {model_name} model loaded!")
+
+            # Transcribe with explicit language setting and GPU support
             if self.language == 'telugu':
-                has_telugu_script = any('\u0c00' <= char <= '\u0c7f' for char in transcribed_text)
-                if not has_telugu_script and transcribed_text.strip():
-                     print("⚠️ Validated: No Telugu characters found in output (might be mixed or error)")
-                     # For now, we allow it but log a warning, as it might be numbers/english words interspersed
-            
+                print("🔤 Transcribing in Telugu (te)...")
+                result = self.whisper_model.transcribe(
+                    tmp_path,
+                    language="te",  # Explicit Telugu
+                    task="transcribe",
+                    verbose=False,
+                    fp16=self.has_cuda  # Use FP16 if GPU available, otherwise FP32
+                )
+            else:  # English
+                print("🔤 Transcribing in English (en)...")
+                result = self.whisper_model.transcribe(
+                    tmp_path,
+                    language="en",
+                    task="transcribe",
+                    verbose=False,
+                    fp16=self.has_cuda
+                )
+
+            transcribed_text = result["text"].strip()
+            print(f"✅ Transcribed: {transcribed_text[:100]}...")
+
+            # Validate script for Telugu
+            if self.language == 'telugu' and transcribed_text:
+                has_telugu = any('\u0c00' <= char <= '\u0c7f' for char in transcribed_text)
+                has_devanagari = any('\u0900' <= char <= '\u097f' for char in transcribed_text)
+                has_tamil = any('\u0b80' <= char <= '\u0bff' for char in transcribed_text)
+
+                if has_devanagari:
+                    print("❌ ERROR: Got Devanagari script instead of Telugu!")
+                    return "⚠️ Could not recognize Telugu clearly. Please speak more clearly."
+                elif has_tamil:
+                    print("❌ ERROR: Got Tamil script instead of Telugu!")
+                    return "⚠️ Speech detected as Tamil. Please ensure you selected Telugu language."
+                elif not has_telugu:
+                    print("⚠️ WARNING: No Telugu characters (might be English/numbers)")
+
             os.unlink(tmp_path)
             return transcribed_text
-            
+
         except Exception as e:
             print(f"❌ Transcription error: {e}")
+            import traceback
+            traceback.print_exc()
             return f"❌ Transcription error: {str(e)}"
 
+    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate text between languages using Google Translate"""
+        if not TRANSLATOR_AVAILABLE:
+            print("⚠️ Translation library not available")
+            return text
+
+        try:
+            # Map language names to codes
+            lang_codes = {
+                'telugu': 'te',
+                'english': 'en'
+            }
+
+            source_code = lang_codes.get(source_lang, source_lang)
+            target_code = lang_codes.get(target_lang, target_lang)
+
+            print(f"🔄 Translating from {source_lang} to {target_lang}...")
+
+            translator = GoogleTranslator(source=source_code, target=target_code)
+            translated = translator.translate(text)
+
+            print(f"✅ Translation complete: {translated[:100]}...")
+            return translated
+
+        except Exception as e:
+            print(f"❌ Translation failed: {e}")
+            return text  # Return original text if translation fails
+
+    def translate_structure(self, data, target_lang='telugu'):
+        """Recursively translates strings in a JSON-like structure (dict/list)."""
+        if not TRANSLATOR_AVAILABLE or target_lang == 'english':
+            return data
+
+        try:
+            if isinstance(data, dict):
+                return {k: self.translate_structure(v, target_lang) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [self.translate_structure(item, target_lang) for item in data]
+            elif isinstance(data, str):
+                # Optimize: skip very short strings or internal keys which might be IDs
+                if len(data.strip()) < 2 or data.isdigit():
+                    return data
+                # Don't translate URLs or file paths
+                if data.startswith("http") or "/" in data:
+                    return data
+                return self.translate_text(data, 'english', target_lang)
+            else:
+                return data
+        except Exception as e:
+            print(f"⚠️ Structure translation failed: {e}")
+            return data
+
     def generate_keywords_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
-        """Generates a structured list of keywords from the provided scope."""
+        """Generates a structured list of keywords using English prompt + Translation."""
         if not self.vectorstore:
             return '{"keywords": []}', [], "keywords"
 
-        # 1. Scope search by book/subject
+        # 0. Translate Question if needed
+        original_q = question
+        if self.language == 'telugu':
+             try:
+                 question = self.translate_text(question, 'telugu', 'english')
+             except: pass
+
+        # 1. Scope search
         filter_dict = {}
         if selected_books:
             filter_dict = {"book_id": {"$in": selected_books}}
@@ -232,183 +324,268 @@ class AITextbookTutorMultilingualBackendOffline:
             filter_dict = {"subject": {"$in": selected_subjects}}
         
         try:
-            # High-density retrieval for keywords
-            relevant_docs = self.vectorstore.similarity_search(
-                question, 
-                k=5, # Further reduced to stay safely within token limits
-                filter=filter_dict
-            )
+            relevant_docs = self.vectorstore.similarity_search(question, k=5, filter=filter_dict)
+            if not relevant_docs: return '{"keywords": []}', [], "keywords"
             
-            if not relevant_docs:
-                return '{"keywords": []}', [], "keywords"
-
-            # 2. Prepare Context
             context_text = "\n\n".join([doc.page_content for doc in relevant_docs])
             sources = [doc.metadata.get('source', 'Unknown') for doc in relevant_docs]
 
-            # 3. Call Keyword Prompt
-            print(f"🔑 Generating Keywords: {question[:60]}...")
+            # 2. English Prompt
+            print(f"🔑 Generating Keywords (English base): {question[:60]}...")
             kw_start = time.time()
-            # Directly use call_llama_optimized with json format for better reliability
-            prompt = f"""Extract 5-8 academic keywords with definitions from this text.
-Text: {context_text[:3000]}
-Format: {{"keywords": [{{"term": "...", "definition": "...", "level": "Basic", "sections": ["..."]}}]}}
-JSON:"""
+            prompt = f"""### SYSTEM:
+You are a Glossary Generator. Extract 5-8 important subject-specific terms from the provided TEXT.
+Focus on the specific topic: "{question}".
+
+### RULES:
+1. Extract terms ONLY from the TEXT below.
+2. Ignore terms like "figure", "table", "summary".
+3. Do NOT define "keyword", "text", or "analysis".
+4. Definitions must be simple and accurate.
+
+### TEXT:
+{context_text[:3000]}
+
+### JSON OUTPUT:
+{{
+  "keywords": [
+    {{
+      "term": "Specific Term",
+      "definition": "Definition from text.",
+      "level": "Basic",
+      "sections": ["Introduction"]
+    }}
+  ]
+}}"""
             response_text = self.call_llama_optimized(prompt, num_predict=1500, format="json")
             
-            kw_duration = time.time() - kw_start
-            print(f"⏱️ Keywords generation completed in {kw_duration:.2f}s")
-            print(f"✅ Got response, mode=keywords, response length={len(response_text)}")
+            # 3. Parse JSON
+            import json
+            try:
+                # Cleaning
+                clean_json = response_text
+                if "```json" in response_text: clean_json = response_text.split("```json")[1].split("```")[0]
+                elif "```" in response_text: clean_json = response_text.split("```")[1].split("```")[0]
+                
+                json_data = json.loads(clean_json)
+                
+                # 4. Translate if necessary
+                if self.language == 'telugu':
+                    print("🔄 Translating Keywords to Telugu...")
+                    json_data = self.translate_structure(json_data, 'telugu')
+                
+                final_json = json.dumps(json_data)
+                print(f"✅ Generated & Translated Keywords. Length: {len(final_json)}")
+                return final_json, sources, "keywords"
+                
+            except Exception as e:
+                print(f"❌ JSON Parse/Translate failed: {e}")
+                return '{"keywords": []}', sources, "keywords"
 
-            # Final check
-            if not response_text.strip().startswith('{'):
-                 return '{"keywords": []}', sources, "keywords"
-
-            return response_text, sources, "keywords"
-            
         except Exception as e:
-            print(f"❌ Keyword generation failed: {e}")
+            print(f"❌ Keyword generation error: {e}")
             return '{"keywords": []}', [], "keywords"
 
-        
     def generate_true_false_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
-        """Generates True/False questions based on textbook context with multi-pass logic."""
-        # 1. Scope search by book/subject
+        """Generates True/False questions using English prompt + Translation."""
+        # 0. Translate Question if needed
+        if self.language == 'telugu':
+             try:
+                 question = self.translate_text(question, 'telugu', 'english')
+             except: pass
+
+        # 1. Scope search
         filter_dict = {}
-        if selected_books:
-            filter_dict = {"book_id": {"$in": selected_books}}
-        elif selected_subjects:
-            filter_dict = {"subject": {"$in": selected_subjects}}
+        if selected_books: filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects: filter_dict = {"subject": {"$in": selected_subjects}}
             
         try:
-            # Retrieve content for T/F generation
-            relevant_docs = self.vectorstore.similarity_search(
-                question, 
-                k=8, # Get a broader pool
-                filter=filter_dict
-            )
-            
-            if not relevant_docs:
-                return '{"questions": []}', [], "truefalse"
+            relevant_docs = self.vectorstore.similarity_search(question, k=8, filter=filter_dict)
+            if not relevant_docs: return '{"questions": []}', [], "truefalse"
 
             context = "\n\n".join([doc.page_content for doc in relevant_docs])
             sources = [doc.metadata.get('source', 'Unknown') for doc in relevant_docs]
-
-            # 2. Extract count from question (default to 5)
+            
+            # Extract count
             import re
             count_match = re.search(r'(\d+)', question)
             q_count = int(count_match.group(1)) if count_match else 5
             
-            # 3. Multi-Pass Strategy (Groups of 5)
-            pass_count = (q_count + 4) // 5 
-            all_questions = []
-            
-            for p in range(pass_count):
-                pass_q_count = 5 if p < pass_count - 1 else q_count - (p * 5)
-                print(f"🌀 True/False Pass {p+1}/{pass_count} for {pass_q_count} questions...")
-                
-                # Craft prompt for this pass
-                current_context = context[p*1500 : (p+1)*1500 + 1000] # Sliding window
-                if not current_context.strip(): current_context = context[:2500]
-                
-                # DEDUPLICATION: Tell AI what NOT to generate
-                existing_topics = ", ".join([q.get('statement', '')[:30] for q in all_questions]) if all_questions else "None"
-                
-                prompt = f"""### SYSTEM:
-Strict academic examiner.
-Goal: Extract {pass_q_count} DIFFERENT True/False facts.
-Constraint: DO NOT REPEAT these ideas: {existing_topics}
+            # 2. English Prompt Strategy (Simplified for brevity)
+            print(f"✅ Generating T/F Questions (English base)...")
+            prompt = f"""### SYSTEM:
+You are a Knowledgeable Teacher. Create {q_count} accurate True/False questions based on "{question}".
 
-### FORMATTING RULES (CRITICAL):
-1. STATEMENTS MUST BE FULL SENTENCES.
-   - BAD: "Produced by oceans"
-   - GOOD: "Oxygen is produced by oceans."
-2. NO DUPLICATES.
+RULES:
+1. FACTUAL ACCURACY IS PARAMOUNT. Double-check standard facts (e.g., geography).
+2. "statement" must be a CLEAR, UNAMBIGUOUS sentence.
+3. Avoid "technically true but incomplete" trick questions.
+4. "explanation" must simply state WHY the answer is correct without contradiction.
+5. If the Context is confusing, prioritize general academic truth.
 
-### TEXT:
-{current_context}
+### CONTEXT:
+{context[:3500]}
 
-### OUTPUT (JSON):
+### JSON OUTPUT:
 {{
   "questions": [
     {{
-      "statement": "Full sentence fact here.",
-      "answer": true/false,
-      "explanation": "Short reason (max 8 words)",
-      "corrected_statement": "Adjustment if false"
+      "statement": "The Southern Hemisphere has more water than the Northern Hemisphere.",
+      "answer": true,
+      "explanation": "Most of the Earth's landmass is in the North, making the South water-dominated.",
+      "corrected_statement": "If false, copy the correct statement here."
     }}
   ]
 }}"""
-                
-                # Parameters for retry logic
-                max_retries_per_pass = 3
-                initial_temperature = 0.1
-                current_temp = initial_temperature
-                
-                retry_count = 0
-                questions_added_in_pass = 0
-                while questions_added_in_pass < pass_q_count and retry_count < max_retries_per_pass:
-                    # Using dynamically selected model for memory stability
-                    response = self.call_llama_optimized(prompt, num_predict=1500, temperature=current_temp, format="json")
-                    
-                    try:
-                        # Clean response and parse
-                        json_match = re.search(r'\{.*\}', response, re.DOTALL)
-                        if json_match:
-                            parsed = json.loads(json_match.group(0))
-                            if "questions" in parsed:
-                                 # DEDUP FILTER
-                                new_qs = []
-                                for q in parsed["questions"]:
-                                    # Simple duplicate check
-                                    is_dup = False
-                                    for old_q in all_questions:
-                                        if q['statement'].lower().strip() == old_q['statement'].lower().strip():
-                                            is_dup = True
-                                            break
-                                    if not is_dup:
-                                        new_qs.append(q)
-                                
-                                all_questions.extend(new_qs)
-                                questions_added_in_pass += len(new_qs)
+            response = self.call_llama_optimized(prompt, num_predict=2000, temperature=0.1, format="json")
 
-                                if len(all_questions) >= q_count: # Hard break if we have enough questions overall
-                                    break
-                                
-                                if questions_added_in_pass == 0:
-                                    print(f"⚠️ No unique questions found in this attempt. Increasing temperature... (Retry {retry_count+1}/{max_retries_per_pass})")
-                                    current_temp = min(current_temp * 1.5, 1.0) # Exponential temperature increase, max 1.0
-                                    retry_count += 1
-                                    # Add a hint to the prompt for more variety
-                                    prompt += "\n\n### IMPORTANT: Please explore DIFFERENT topics than previous questions."
-                                else:
-                                    # Reset temperature and retry count if progress was made
-                                    current_temp = initial_temperature
-                                    retry_count = 0
-                            else:
-                                print(f"⚠️ Pass {p+1} failed to parse JSON (no 'questions' key). Retrying...")
-                                retry_count += 1
-                                current_temp = min(current_temp * 1.5, 1.0)
-                        else:
-                            print(f"⚠️ Pass {p+1} failed to parse JSON (no match). Retrying...")
-                            retry_count += 1
-                            current_temp = min(current_temp * 1.5, 1.0)
-                    except Exception as e:
-                        print(f"⚠️ Pass {p+1} failed to parse JSON: {e}. Retrying...")
-                        retry_count += 1
-                        current_temp = min(current_temp * 1.5, 1.0)
+            # 3. Parse & Translate
+            import json
+            try:
+                clean_json = response
+                if "```json" in response: clean_json = response.split("```json")[1].split("```")[0]
+                elif "```" in response: clean_json = response.split("```")[1].split("```")[0]
                 
-                if len(all_questions) >= q_count: # Break outer loop if enough questions are generated
-                    break
+                json_data = json.loads(clean_json)
+                if "questions" not in json_data: json_data = {"questions": []}
+                
+                # Filter to q_count just in case
+                json_data["questions"] = json_data["questions"][:q_count]
+                
+                if self.language == 'telugu':
+                    print("🔄 Translating T/F Questions to Telugu...")
+                    json_data = self.translate_structure(json_data, 'telugu')
+                
+                final_json = json.dumps(json_data["questions"])
+                return final_json, sources, "truefalse"
+                
+            except Exception as e:
+                print(f"❌ T/F Parse/Translate failed: {e}")
+                return '{"questions": []}', sources, "truefalse"
 
-            # 4. Return results - Returning JUST THE LIST for frontend consistency
-            final_json = json.dumps(all_questions[:q_count])
-            print(f"✅ Got response, mode=truefalse, response length={len(final_json)}")
-            return final_json, sources, "truefalse"
+        except Exception as e:
+            print(f"❌ T/F generation error: {e}")
+            return '{"questions": []}', [], "truefalse"
+
+    def generate_quiz_response(self, question: str, selected_subjects: list, selected_books: list):
+        """Generate strictly formatted JSON quiz (English -> Translated)"""
+        print(f"🧩 Generating Quiz: {question}")
+
+        # 0. Translate Question if needed
+        if self.language == 'telugu':
+             try:
+                 question = self.translate_text(question, 'telugu', 'english')
+             except: pass
+
+        # 1. Check vectorstore
+        if not self.vectorstore:
+            return '{"error": "No textbooks loaded."}', [], "quiz"
+
+        # 2. Scope Search
+        filter_dict = None
+        if selected_books: filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects: filter_dict = {"subject": {"$in": selected_subjects}}
+
+        try:
+            relevant_docs = self.vectorstore.similarity_search(question, k=4, filter=filter_dict)
+            context = "\n\n".join([doc.page_content for doc in relevant_docs])[:2500]
+        except Exception as e:
+            print(f"⚠️ Quiz context search failed: {e}")
+            context = "No specific textbook context found."
+
+        # 3. English Prompt (ALWAYS)
+        prompt = f"""### SYSTEM:
+You are an Expert Teacher. Create a high-quality Multiple Choice Quiz about "{question}".
+
+### CONTEXT:
+{context}
+
+### RULES:
+1. Questions must be FACTUALLY ACCURATE and CONCEPTUAL.
+2. If context lacks details, use STANDARD ACADEMIC KNOWLEDGE to ensure correctness.
+3. Options must be UNIQUE and plausible. NO "All of the above".
+4. ABSOLUTELY NO prefixes in options (e.g. "A)", "1."). Just the answer text.
+5. Randomize the correct answer position.
+
+### FORMAT:
+[
+  {{
+    "question": "What is the primary function of...?",
+    "options": ["Function A", "Function B", "Function C", "Function D"],
+    "correct_index": 2,
+    "explanation": "Function C is correct because..."
+  }}
+]
+
+### JSON:"""
+
+        # 4. Call LLM
+        print(f"🧩 Sending quiz request to AI ({self.model_name})...")
+        response = self.call_llama_optimized(prompt, num_predict=2500, temperature=0.0)
+        
+        # 5. Process & Translate
+        try:
+            import json
+            clean_json = response
+            if "```json" in response: clean_json = response.split("```json")[1].split("```")[0]
+            elif "```" in response: clean_json = response.split("```")[1].split("```")[0]
+            
+            json_start = clean_json.find('[')
+            json_end = clean_json.rfind(']')
+            if json_start != -1 and json_end != -1:
+                clean_json = clean_json[json_start:json_end+1]
+            
+            # Basic cleanup for common trailing commas
+            clean_json = re.sub(r',\s*\]', ']', clean_json)
+            
+            json_data = json.loads(clean_json)
+            
+            # Normalize
+            if isinstance(json_data, dict):
+                json_data = json_data.get("quiz", json_data.get("questions", [json_data]))
+            if not isinstance(json_data, list):
+                json_data = [json_data]
+                
+            valid_questions = []
+            for i, q in enumerate(json_data):
+                if not isinstance(q, dict): continue
+                
+                # Lenient key matching
+                question_text = q.get("question", q.get("text", ""))
+                options = q.get("options", q.get("choices", []))
+                correct_idx = q.get("correct_index", 0)
+                explanation = q.get("explanation", "See above.")
+                
+                if not question_text or not isinstance(options, list) or len(options) < 2:
+                    continue
+                
+                # CLEANUP: Remove prefixes if AI failed to follow rules
+                clean_options = []
+                for opt in options[:4]:
+                    # Remove "A)", "A.", "1)", "(a)" etc
+                    opt = re.sub(r'^[A-Da-d0-9]+[\.\)\-]\s*', '', str(opt))
+                    clean_options.append(opt)
+
+                valid_questions.append({
+                    "id": i + 1,
+                    "question": question_text,
+                    "options": clean_options,
+                    "correct_index": int(correct_idx) if str(correct_idx).isdigit() else 0,
+                    "explanation": explanation
+                })
+
+            # TRANSLATION STEP
+            if self.language == 'telugu' and valid_questions:
+                print("🔄 Translating Quiz to Telugu...")
+                valid_questions = self.translate_structure(valid_questions, 'telugu')
+
+            final_json = json.dumps(valid_questions)
+            print(f"✅ Generated & Translated Quiz. Length: {len(final_json)}")
+            return final_json, [], "quiz"
             
         except Exception as e:
-            print(f"❌ True/False generation failed: {e}")
-            return '{"questions": []}', [], "truefalse"
+            print(f"❌ Quiz parsing/translation failed: {e}")
+            return '{"error": "AI response was malformed."}', [], "quiz"
 
     def speak_text(self, text: str):
         """OFFLINE text-to-speech generation with thread-safe engine initialization"""
@@ -722,16 +899,25 @@ Output ONLY valid JSON in this exact structure:
       "sections": ["Section Name"],
       "definition_source": "textbook"
     }}
+    }}
   ]
 }}"""
             # Use JSON mode for absolute enforcement
             response = self.call_llama_optimized(prompt, num_predict=1500, format="json")
             
-            # CRITICAL FIX: Extract JSON even if AI adds preamble (extra safety)
-            import re
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                response = json_match.group(0)
+            # Translate if needed
+            if self.language == 'telugu':
+                # We need to parse strict json here to translate structure
+                import json
+                try:
+                    clean = response
+                    if "```json" in clean: clean = clean.split("```json")[1].split("```")[0]
+                    elif "```" in clean: clean = clean.split("```")[1].split("```")[0]
+                    data = json.loads(clean)
+                    data = self.translate_structure(data, 'telugu')
+                    return json.dumps(data)
+                except:
+                    return response # Return raw if parse fails
             
             if not response.strip().startswith('{'):
                 print(f"⚠️ Keyword AI failed to provide JSON. Returning empty JSON. Raw: {response[:100]}")
@@ -775,31 +961,37 @@ Output ONLY valid JSON in this exact structure:
 3. Encouragement: A positive closing thought to keep them studying."""
 
         # 2. Build Final Prompt
-        if self.language == 'telugu':
-            prompt = f"""మీరు ఒక తెలివైన తెలుగు ట్యూటర్. పాఠ్యపుస్తకం నుండి సేకరించిన సమాచారాన్ని ఉపయోగించి విద్యార్థికి సహాయం చేయండి.
-            
-విద్యార్థి ప్రశ్న: "{question}"
+        # TRANSLATION APPROACH: Always generate in English, translate Telugu questions first
+        if self.language == 'telugu' and TRANSLATOR_AVAILABLE:
+            # Translate Telugu question to English for better AI understanding
+            try:
+                print(f"🔄 Translating Telugu question to English...")
+                question_english = self.translate_text(question, 'telugu', 'english')
+                print(f"   Telugu: {question[:60]}...")
+                print(f"   English: {question_english[:60]}...")
+                question = question_english  # Use translated question for prompt
+            except Exception as e:
+                print(f"⚠️ Question translation failed: {e}")
 
-సంబంధిత పాఠ్యపుస్తక సమాచారం:
-{context}
+        # ALWAYS use English prompt (translation happens at the end)
+        prompt = f"""You are an intelligent AI tutor helping a student.
 
-మీ పని (User instructions override constraints):
-{task_instr}
-
-ముఖ్య గమనిక: పాఠ్యపుస్తక శీర్షికలను (headings) మళ్ళీ చెప్పవద్దు. మీరు నేరుగా సమాధానంతో ప్రారంభించండి. ఇండెంటేషన్ వద్దు.
-"""
-        else:
-            prompt = f"""You are an intelligent AI tutor. Use the provided textbook excerpt to help the student.
-            
 Student Question: "{question}"
 
-Relevant Textbook Content:
+Textbook Content:
 {context}
 
-Your task (User instructions override constraints):
+Your Task:
 {task_instr}
 
-Note: Jump STRAIGHT into the answer. Do NOT repeat textbook headings or general greetings. Stay strictly on topic.
+CRITICAL INSTRUCTIONS:
+1. Answer in clear, simple English
+2. If the textbook content doesn't fully answer the question, USE YOUR GENERAL KNOWLEDGE
+3. Do NOT say "this is not in your textbook" - just answer using what you know
+4. Jump STRAIGHT into the answer
+5. Provide accurate, helpful information
+
+Answer:
 """
         # Mode-specific settings
         config = {
@@ -807,18 +999,37 @@ Note: Jump STRAIGHT into the answer. Do NOT repeat textbook headings or general 
             "standard": {"predict": 600, "timeout": 300},
             "premium": {"predict": 1200, "timeout": 600}
         }.get(mode, {"predict": 600, "timeout": 300})
-        
-        return self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
+
+        # Generate response
+        response = self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
+
+        # TRANSLATION APPROACH: If Telugu language, translate English response to Telugu
+        if self.language == 'telugu' and TRANSLATOR_AVAILABLE:
+            try:
+                print(f"🔄 Translating English response to Telugu...")
+                print(f"   English response: {response[:100]}...")
+                telugu_response = self.translate_text(response, 'english', 'telugu')
+                print(f"✅ Telugu response: {telugu_response[:100]}...")
+                return telugu_response
+            except Exception as e:
+                print(f"⚠️ Translation failed, returning English response: {e}")
+                return response
+
+        return response
 
     def chat_with_general_knowledge(self, question: str, mode: str = "standard") -> str:
-        """AI response using general knowledge when textbook doesn't have info"""
+        """AI response using general knowledge when textbook doesn't have info (English -> Translated)"""
         if not self.llm_available:
-            if self.language == 'telugu':
-                return "ఈ విషయం మీ పాఠ్యపుస్తకంలో లేదు. దయచేసి మీ ఉపాధ్యాయుడిని అడగండి."
-            else:
-                return "This topic is not in your textbook. Please ask your teacher."
+            return "ఈ విషయం మీ పాఠ్యపుస్తకంలో లేదు. దయచేసి మీ ఉపాధ్యాయుడిని అడగండి." if self.language == 'telugu' else "This topic is not in your textbook. Please ask your teacher."
         
-        # 1. Define Basic instructions based on mode
+        # 1. Translate Question if needed
+        if self.language == 'telugu':
+             try:
+                 print(f"🔄 Translating GK Question to English...")
+                 question = self.translate_text(question, 'telugu', 'english')
+             except: pass
+
+        # 2. Define Basic instructions based on mode
         if mode == "brief":
             prompt_instr = "Give a very short educational summary."
         elif mode == "premium":
@@ -826,21 +1037,13 @@ Note: Jump STRAIGHT into the answer. Do NOT repeat textbook headings or general 
         else:
             prompt_instr = "Provide a helpful educational response."
 
-        if self.language == 'telugu':
-            prompt = f"""A Telugu student asked: "{question}"
-            
-{prompt_instr}
-
-Start with: "ఈ విషయం మీ పాఠ్యపుస్తకంలో లేదు, కానీ నేను వివరించగలను..."
-and respond in Telugu.
-"""
-        else:
-            prompt = f"""A student asked: "{question}"
+        # 3. English Prompt
+        prompt = f"""You are a helpful Tutor. 
+Student Question: "{question}"
 
 {prompt_instr}
 
-Start with: "This topic isn't in your textbook, but I can help explain..."
-and respond in English.
+Start with: "This topic isn't in your textbook, but I can explain..."
 """
         # Mode-specific settings
         config = {
@@ -849,7 +1052,15 @@ and respond in English.
             "premium": {"predict": 1200, "timeout": 600} 
         }.get(mode, {"predict": 600, "timeout": 300})
         
-        return self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
+        # 4. Generate
+        response = self.call_llama(prompt, mode=mode, num_predict=config["predict"], timeout=config["timeout"])
+        
+        # 5. Translate Response if needed
+        if self.language == 'telugu':
+            print("🔄 Translating GK Response to Telugu...")
+            response = self.translate_text(response, 'english', 'telugu')
+
+        return response
     
     def call_llama(self, prompt: str, context: str = "", mode: str = "standard", num_predict: int = None, timeout: int = None) -> str:
         """Make API call to local Ollama with dynamic budgets and robustness."""
@@ -933,23 +1144,23 @@ and respond in English.
     def generate_quiz_response(self, question: str, selected_subjects: list, selected_books: list):
         """Generate strictly formatted JSON quiz"""
         print(f"🧩 Generating Quiz: {question}")
-        
+
         # 1. Check if vectorstore exists
         if not self.vectorstore:
             print("⚠️ No vectorstore available - cannot generate quiz from textbooks")
             return '{"error": "No textbooks loaded. Please upload textbooks first."}', [], "quiz"
-        
+
         # 2. Broad Context Search
         filter_dict = None
         if selected_books:
             filter_dict = {"book_id": {"$in": selected_books}}
         elif selected_subjects:
             filter_dict = {"subject": {"$in": selected_subjects}}
-            
+
         try:
             relevant_docs = self.vectorstore.similarity_search(
-                question, 
-                k=4, 
+                question,
+                k=4,
                 filter=filter_dict
             )
             context = "\n\n".join([doc.page_content for doc in relevant_docs])[:2500]
@@ -957,8 +1168,23 @@ and respond in English.
             print(f"⚠️ Quiz context search failed: {e}")
             context = "No specific textbook context found."
 
-        # 3. Robust Prompt for Code-Block JSON with Verification Logic
-        prompt = f"""You are an elite Quiz Expert. Generate a logical 5-question quiz in JSON format.
+        # 3. Robust Prompt for Code-Block JSON with Verification Logic (Language-aware)
+        if self.language == 'telugu':
+            prompt = f"""మీరు ఒక నిపుణుడైన క్విజ్ నిర్మాత. JSON ఫార్మాట్‌లో 5 ప్రశ్నల క్విజ్ సృష్టించండి.
+
+సందర్భం (CONTEXT):
+{context}
+
+నియమాలు (RULES):
+- స్వచ్ఛమైన ఆప్షన్లు: కేవలం సమాధాన టెక్స్ట్ మాత్రమే. "A)", "B.", లేదా "1)" ప్రిఫిక్స్‌లు వద్దు.
+- పరస్పర విశిష్టత: ఆప్షన్లు విభిన్నంగా ఉండాలి. ఒక ఆప్షన్ మాత్రమే సరైనది.
+- వివరణ మొదట: "explanation" మొదట వ్రాసి, తర్వాత సరైన సూచిక ఎంచుకోండి.
+- నిండుగా: ఉదాహరణ టెక్స్ట్ ఉపయోగించవద్దు. అసలైన, సందర్భానికి సంబంధించిన ఆప్షన్లు సృష్టించండి.
+- స్కీమా: [{{"id": 1, "question": "ఉదాహరణ?", "options": ["ఆప్షన్ A", "ఆప్షన్ B", "ఆప్షన్ C", "ఆప్షన్ D"], "explanation": "వాస్తవం.", "correct_index": 0}}]
+
+JSON అవుట్‌పుట్ (తెలుగులో ప్రశ్నలు మరియు ఆప్షన్లు):"""
+        else:
+            prompt = f"""You are an elite Quiz Expert. Generate a logical 5-question quiz in JSON format.
 
 CONTEXT:
 {context}
@@ -1107,47 +1333,43 @@ JSON OUTPUT:"""
         return ""
 
     def generate_summary_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
-        """Generates a structured, comprehensive summary of textbook content."""
+        """Generates a structured, comprehensive summary of textbook content (English -> Translated)."""
         if not self.vectorstore:
-            return "This textbook does not contain readable text to summarize.", [], "summary"
+            return "ఈ పాఠ్యపుస్తకంలో సారాంశం చేయడానికి తగిన పాఠం లేదు." if self.language == 'telugu' else "This textbook does not contain readable text to summarize.", [], "summary"
 
-        # 1. Scope search by book/subject
+        # 0. Translate Question if needed
+        if self.language == 'telugu':
+             try:
+                 question = self.translate_text(question, 'telugu', 'english')
+             except: pass
+
+        # 1. Scope search
         filter_dict = {}
-        if selected_books:
-            filter_dict = {"book_id": {"$in": selected_books}}
-        elif selected_subjects:
-            filter_dict = {"subject": {"$in": selected_subjects}}
+        if selected_books: filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects: filter_dict = {"subject": {"$in": selected_subjects}}
             
         try:
-            # High-density retrieval for summary
-            relevant_docs = self.vectorstore.similarity_search(
-                question, 
-                k=10, # Get more chunks for a full summary
-                filter=filter_dict
-            )
-            if not relevant_docs:
-                return "This textbook does not contain readable text to summarize.", [], "summary"
-                
+            relevant_docs = self.vectorstore.similarity_search(question, k=10, filter=filter_dict)
+            if not relevant_docs: 
+                 return "పాఠ్యపుస్తక సమాచారం దొరకలేదు." if self.language == 'telugu' else "Textbook content not found.", [], "summary"
             context = "\n\n".join([doc.page_content for doc in relevant_docs])[:4000]
         except Exception as e:
-            print(f"⚠️ Summary context search failed: {e}")
-            return "This textbook does not contain readable text to summarize.", [], "summary"
+            print(f"⚠️ Summary search failed: {e}")
+            return "శోధన విఫలమైంది." if self.language == 'telugu' else "Search failed.", [], "summary"
 
-        # 2. Craft Prompt for Structured Summary
-        prompt = f"""You are a Content Strategist & Educator. Provide a structured, concise summary of the following content.
-
+        # 2. English Prompt
+        prompt = f"""You are a Content Strategist. Summarize this content related to "{question}".
 STRUCTURE:
-1. Title: Create a professional title based on the book or chapter.
-2. Overview: A 3-4 sentence paragraph explanation of the content.
-3. Section Breakdown: Use clear Headings. Summarize major topics with paragraphs and bullet points.
-4. Key Takeaways: 5-8 major bullet points.
-5. Important Terms: List key terms with 1-line definitions.
+1. Title: Professional title.
+2. Overview: 3-4 sentences.
+3. Section Breakdown: Use Headings.
+4. Key Takeaways: 5-8 bullet points.
+5. Important Terms: List with definitions.
 
 RULES:
-- Language must be simple and student-friendly.
-- No markdown tables. Use headings (###) and lists (-).
-- Explain all jargon.
-- Do NOT hallucinate content outside the provided text.
+- Simple language.
+- Use markdown headings (###) and lists (-).
+- NO hallucinations.
 
 CONTENT:
 {context}
@@ -1155,588 +1377,350 @@ CONTENT:
 SUMMARY OUTPUT:"""
 
         print(f"📚 Generating Summary: {question[:60]}...")
-        summary_start = time.time()
-        
-        # Call LLM with zero temperature for absolute determinism
         response = self.call_llama_optimized(prompt, num_predict=2000, temperature=0.0)
         
-        summary_duration = time.time() - summary_start
-        print(f"⏱️ Summary generation completed in {summary_duration:.2f}s")
-        print(f"✅ Got response, mode=summary, response length={len(response)}")
+        # 3. Translate if Telugu
+        if self.language == 'telugu':
+            print("🔄 Translating Summary to Telugu...")
+            # Translate section by section to preserve some markdown structure if possible
+            # But deep_translator handles text well. Let's try full block.
+            response = self.translate_text(response, 'english', 'telugu')
 
-        # Max Length Guard (12,000 characters)
         if len(response) > 12000:
-            response = response[:11950] + "\n\n[This summary has been shortened for readability.]"
-
-        if not response.strip():
-            return "Unable to generate summary right now. Please try again.", [], "summary"
+             response = response[:11950] + "\n\n[Truncated]"
 
         return response, [], "summary"
 
     def generate_flashcards_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
-        """Generates a list of high-quality flashcards from textbook context."""
+        """Generates flashcards from textbook context (English -> Translated)."""
         print(f"🗂️ Generating Flashcards: {question[:60]}...")
-        flash_start = time.time()
 
-        # 1. Search for broader context to get enough cards
+        # 0. Translate Question if needed
+        if self.language == 'telugu':
+             try:
+                 question = self.translate_text(question, 'telugu', 'english')
+             except: pass
+
+        # 1. Search Context
         filter_dict = None
-        if selected_books:
-            filter_dict = {"book_id": {"$in": selected_books}}
-        elif selected_subjects:
-            filter_dict = {"subject": {"$in": selected_subjects}}
+        if selected_books: filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects: filter_dict = {"subject": {"$in": selected_subjects}}
 
         try:
-            # Reverting k to 22 for speed balance (25/35 was too slow)
             relevant_docs = self.vectorstore.similarity_search(question, k=22, filter=filter_dict)
-            base_context_paragraphs = [doc.page_content for doc in relevant_docs]
-            # Verify we have content
-            if not base_context_paragraphs:
-                 return [], [], "error"
-            
-            # Full context for reference
-            full_context_str = "\n\n".join(base_context_paragraphs)
+            base_docs = [doc.page_content for doc in relevant_docs]
+            if not base_docs: return [], [], "error"
         except Exception as e:
-            print(f"⚠️ Vector search failed for Flashcards: {e}")
+            print(f"⚠️ Vector search failed: {e}")
             return [], [], "error"
 
-        # 2. Extract card count from question if provided (e.g. "Generate 20 cards")
-        card_count = 10
+        # 2. Count - Extract the FIRST number from the question for card count
         import re
         match = re.search(r'(\d+)', question)
-        if match:
-            card_count = int(match.group(1))
-        
-        # Limit count for local AI stability
+        card_count = int(match.group(1)) if match else 10
         card_count = min(max(card_count, 5), 30)
+        print(f"📊 Target flashcard count: {card_count}")
 
-        # 3. Robust While-Loop Strategy
+        # 3. Generation Loop (English Only)
         all_flashcards = []
         batch_size = 5
-        # Calculate passes needed, but be willing to add an extra pass if dedup reduces count
-        estimated_passes = (card_count + batch_size - 1) // batch_size
-        max_total_passes = estimated_passes + 2 # Allow 2 extra passes to fill gaps
-        
-        print(f"🌀 Flashcards Generation: Target {card_count} cards (allowing up to {max_total_passes} passes)...")
+        passes = (card_count + batch_size - 1) // batch_size + 2
 
-        for pass_idx in range(max_total_passes):
+        for p in range(passes):
             if len(all_flashcards) >= card_count:
+                print(f"✅ Reached target count: {len(all_flashcards)}/{card_count}")
                 break
-                
+
             needed = min(batch_size, card_count - len(all_flashcards))
-            print(f"   🔹 Pass {pass_idx+1}: Need {needed} more (Current: {len(all_flashcards)}/{card_count})")
-            
-            # Simple Exclusion List
-            current_excludes = ", ".join([c['front'][:40] for c in all_flashcards]) if all_flashcards else "None"
-            
-            # SHUFFLE STRATEGY (Better than Sliding Window for small texts)
-            # Pass 1: Original Order (Logical flow)
-            # Pass 2+: Random Shuffle (Breaks attention bias to start of text)
-            
+            print(f"   🔹 Pass {p+1}: Need {needed} more flashcards (currently have {len(all_flashcards)})...")
+
+            # Context Shuffle
             import random
-            current_paragraphs = base_context_paragraphs[:] # Copy
-            if pass_idx > 0:
-                random.shuffle(current_paragraphs)
-            
-            current_context_text = "\n\n".join(current_paragraphs)
-            
+            curr_docs = base_docs[:]
+            if p > 0: random.shuffle(curr_docs)
+            curr_context = "\n\n".join(curr_docs)[:4500]  # Increased context size
+
             prompt = f"""### INSTRUCTION:
-You are an expert educational content creator. Your task is to generate {needed + 2} unique, high-quality flashcards based ONLY on the provided textbook context.
+Generate EXACTLY {needed + 2} high-quality flashcards from the text below.
+CRITICAL RULES:
+1. Each "front" MUST be a COMPLETE question (minimum 5 words)
+2. Each "back" MUST be a COMPLETE answer (minimum 3 words)
+3. DO NOT use incomplete questions like "What is...?" - use "What is an ocean?"
+4. Questions must be clear, specific, and educational
+5. Answers must be accurate and based on the text
+6. "importance" must be one of: high, medium, low (lowercase only)
+7. "hint" can be empty string "" if not needed
 
-### GUIDELINES:
-- Create {needed + 2} distinct cards.
-- Focus on key terms, definitions, and facts.
-- Avoid repeating facts from: {current_excludes}
-- Response MUST be a valid JSON array.
-- Keep definitions SHORT (under 15 words).
+### TEXT:
+{curr_context}
 
-### TEXTBOOK CONTEXT:
-{current_context_text}
-
-### EXAMPLE JSON (Pattern to follow):
+### GOOD EXAMPLES:
 [
-  {{
-    "id": 1, 
-    "front": "What is the largest planet in the solar system?", 
-    "back": "Jupiter", 
-    "hint": "Gas giant", 
-    "importance": "high"
-  }},
-  {{
-    "id": 2, 
-    "front": "Which planet is known as the Red Planet?", 
-    "back": "Mars", 
-    "hint": "Fourth planet", 
-    "importance": "medium"
-  }}
+  {{"id": 1, "front": "What are the five major oceans on Earth?", "back": "Pacific, Atlantic, Indian, Arctic, and Southern Ocean", "hint": "Think of the largest water bodies", "importance": "high"}},
+  {{"id": 2, "front": "How many continents are there on Earth?", "back": "There are seven continents", "hint": "Standard geographical classification", "importance": "medium"}}
 ]
 
-### FLASHCARDS OUTPUT (Generate {needed} cards about the TEXTBOOK CONTEXT):"""
+### BAD EXAMPLES (DO NOT DO THIS):
+[
+  {{"front": "What is...?", "back": "Answer"}},
+  {{"front": "Define", "back": "Def"}}
+]
 
-            # Call AI for this batch - Use Qwen with standard temp
-            # Higher temp (0.2) to avoid repetitive loops, but low enough for JSON stability
-            response_text = self.call_llama_optimized(prompt, num_predict=1500, temperature=0.2)
+### NOW GENERATE {needed + 2} COMPLETE FLASHCARDS IN JSON FORMAT:"""
+
+            response_text = self.call_llama_optimized(prompt, num_predict=2000, temperature=0.3)
             
-            # Parse JSON with robustness for this batch
             try:
-                # 1. Basic cleaning
-                clean_text = response_text.strip()
-                if "```json" in clean_text:
-                    clean_text = clean_text.split("```json")[-1].split("```")[0]
-                elif "```" in clean_text:
-                    clean_text = clean_text.split("```")[-1].split("```")[0]
+                # Clean JSON
+                clean = response_text
+                if "```json" in clean: clean = clean.split("```json")[-1].split("```")[0]
+                elif "```" in clean: clean = clean.split("```")[-1].split("```")[0]
                 
-                start_idx = clean_text.find('[')
-                end_idx = clean_text.rfind(']')
-                
-                if start_idx != -1 and end_idx != -1:
-                    json_blob = clean_text[start_idx:end_idx+1]
+                start = clean.find('[')
+                end = clean.rfind(']')
+                if start != -1 and end != -1:
+                    clean = clean[start:end+1]
+                    clean = re.sub(r',\s*\]', ']', clean) # trailing comma fix
                     
-                    # 2. JSON Repair Logic
-                    import re
-                    # Remove trailing commas
-                    json_blob = re.sub(r',\s*([\]}])', r'\1', json_blob)
-                    # Add missing commas between objects
-                    json_blob = re.sub(r'}\s*{', '}, {', json_blob)
+                    data = json.loads(clean)
                     
-                    import json
-                    batch_cards = json.loads(json_blob)
-                    
-                    cards_added_in_pass = 0
-                    
-                    # Deduplication (Exact + Loose Substring)
-                    # We dropped the expensive Semantic Check because it was deleting too much
-                    seen_fronts = {re.sub(r'[^\w\s]', '', c['front'].lower().strip()) for c in all_flashcards}
-                    
-                    for card in batch_cards:
-                        if isinstance(card, dict) and 'front' in card and 'back' in card:
-                            f_norm = re.sub(r'[^\w\s]', '', card['front'].lower().strip())
-                            
-                            # Check 1: Exact Front Match
-                            if f_norm in seen_fronts:
-                                print(f"⚠️ Redundant Flashcard skipped: {card['front'][:30]}...")
+                    # Validate, Dedup & Add
+                    for card in data:
+                        if len(all_flashcards) >= card_count: break
+                        if 'front' in card and 'back' in card:
+                            front = str(card['front']).strip()
+                            back = str(card['back']).strip()
+
+                            # VALIDATION: Reject incomplete or poor quality flashcards
+                            # 1. Check minimum length (complete questions/answers)
+                            if len(front.split()) < 4 or len(back.split()) < 2:
+                                print(f"   ⚠️ Rejected incomplete card: '{front[:30]}' / '{back[:30]}'")
                                 continue
-                            
-                            # Check 2: Keyword Similarity (Semantic Dedup)
-                            # Simple "Bag of Words" overlap to catch rephrasing
-                            # e.g. "What is largest planet?" vs "Which is the biggest planet?"
-                            is_suspicious = False
-                            
-                            def get_keywords(text):
-                                # Simple tokenizer: lowercase, alpha only, ignore short words
-                                return {w for w in re.split(r'\W+', text.lower()) if len(w) > 3}
-                            
-                            new_kw = get_keywords(card['front'])
-                            
-                            for existing in all_flashcards:
-                                old_kw = get_keywords(existing['front'])
-                                # Jaccard-ish overlap
-                                if not new_kw or not old_kw: continue
-                                
-                                overlap = len(new_kw & old_kw)
-                                # If >75% of the new card's keywords are already in an old card, it's a dup
-                                if overlap / len(new_kw) > 0.75:
-                                    print(f"⚠️ Semantic Duplicate detected: '{card['front'][:30]}...' ~= '{existing['front'][:30]}...'")
-                                    is_suspicious = True
-                                    break
-                            
-                            if is_suspicious:
+
+                            # 2. Check for incomplete patterns
+                            if front.endswith('...?') or front.endswith('...') or back.endswith('...'):
+                                print(f"   ⚠️ Rejected truncated card: '{front[:30]}'")
                                 continue
-                                
-                            card['id'] = len(all_flashcards) + 1
-                            all_flashcards.append(card)
-                            seen_fronts.add(f_norm)
-                            cards_added_in_pass += 1
-                            
-                            if len(all_flashcards) >= card_count:
-                                break
-                    
-                    print(f"✅ Pass {pass_idx+1}: Added {cards_added_in_pass} new cards.")
-                    
-                else:
-                    print(f"⚠️ Pass {pass_idx+1}: No JSON array found.")
-                    
+
+                            # 3. Simple dedup
+                            if any(c['front'][:15] == front[:15] for c in all_flashcards):
+                                continue
+
+                            # 4. Normalize importance field
+                            importance = str(card.get('importance', 'medium')).lower()
+                            if importance not in ['high', 'medium', 'low']:
+                                importance = 'medium'
+
+                            # Add validated card
+                            validated_card = {
+                                'id': len(all_flashcards) + 1,
+                                'front': front,
+                                'back': back,
+                                'hint': str(card.get('hint', '')).strip(),
+                                'importance': importance
+                            }
+                            all_flashcards.append(validated_card)
+                            print(f"   ✅ Added card #{len(all_flashcards)}: '{front[:40]}...'")
+
             except Exception as e:
-                print(f"❌ JSON Parse failed in Pass {pass_idx+1}: {e}")
+                print(f"   ⚠️ Pass {p+1} JSON error: {e}")
 
-        print(f"✅ Generated {len(all_flashcards)} valid cards")
+        # 4. Translate Result with Better Context
+        if self.language == 'telugu' and all_flashcards:
+            print(f"🔄 Translating {len(all_flashcards)} Flashcards to Telugu (batched for quality)...")
+            try:
+                # Translate flashcards in a smarter way to preserve context
+                translated_cards = []
+                for i, card in enumerate(all_flashcards):
+                    print(f"   Translating card {i+1}/{len(all_flashcards)}...")
+                    translated_card = {
+                        'id': card['id'],
+                        'front': self.translate_text(card['front'], 'english', 'telugu'),
+                        'back': self.translate_text(card['back'], 'english', 'telugu'),
+                        'hint': self.translate_text(card['hint'], 'english', 'telugu') if card['hint'] else '',
+                        'importance': card['importance']  # Keep English for this field
+                    }
+                    translated_cards.append(translated_card)
+                all_flashcards = translated_cards
+                print(f"✅ Translation complete!")
+            except Exception as e:
+                print(f"⚠️ Translation failed, using English: {e}")
 
-        if not all_flashcards:
-            return [], [], "error"
-
+        print(f"✅ Generated {len(all_flashcards)} cards.")
         return all_flashcards, [], "flashcards"
 
     def generate_oral_test_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
-        """Generates a structured list of questions for an oral exam from textbook context."""
+        """Generates a structured list of questions for an oral exam (English -> Translated)."""
         print(f"🎙️ Generating Oral Test Questions: {question[:60]}...")
-        oral_start = time.time()
+        
+        # 0. Translate Question if needed
+        if self.language == 'telugu':
+             try:
+                 question = self.translate_text(question, 'telugu', 'english')
+             except: pass
 
-        # 1. Broad context search
+        # 1. Search
         filter_dict = None
-        if selected_books:
-            filter_dict = {"book_id": {"$in": selected_books}}
-        elif selected_subjects:
-            filter_dict = {"subject": {"$in": selected_subjects}}
+        if selected_books: filter_dict = {"book_id": {"$in": selected_books}}
+        elif selected_subjects: filter_dict = {"subject": {"$in": selected_subjects}}
 
         try:
             relevant_docs = self.vectorstore.similarity_search(question, k=15, filter=filter_dict)
             context = "\n\n".join([doc.page_content for doc in relevant_docs])
-            
-            if not context or len(context.strip()) < 100:
-                print("⚠️ Insufficient context found for Oral Test questions.")
-                return [], [], "error"
+            if not context: return [], [], "error"
         except Exception as e:
-            print(f"⚠️ Vector search failed for Oral Test: {e}")
+            print(f"⚠️ Vector search failed: {e}")
             return [], [], "error"
 
-        # 2. Extract question count
-        q_count = 5
+        # 2. Count
         import re
         match = re.search(r'(\d+)', question)
-        if match:
-            q_count = int(match.group(1))
-        
-        q_count = min(max(q_count, 3), 15) # Limit for stability
+        q_count = int(match.group(1)) if match else 5
+        q_count = min(max(q_count, 3), 15)
 
-        # 3. Generation Logic (Single or Two-Pass depending on count)
+        # 3. Generation Loop (English Only)
         all_questions = []
         batch_size = 5
-        num_passes = (q_count + batch_size - 1) // batch_size
-
-        for pass_idx in range(num_passes):
-            current_batch_count = min(batch_size, q_count - len(all_questions))
+        passes = (q_count + batch_size - 1) // batch_size
+        
+        for p in range(passes):
+            current_count = min(batch_size, q_count - len(all_questions))
             
-            # Sub-retry loop for this specific pass
-            max_pass_retries = 3 # Increased retries
-            for retry_idx in range(max_pass_retries):
-                # Clean prompt to remove starting "3 " or similar counts
-                topic_hint = re.sub(r'^\d+\s*', '', question.replace("Generate ", "").replace("oral test questions for ", "").strip())
-                
-                print(f"🌀 Oral Test Pass {pass_idx + 1}/{num_passes} (Attempt {retry_idx + 1}/{max_pass_retries}) for {current_batch_count} questions (Topic: {topic_hint})")
+            prompt = f"""### SYSTEM:
+Generate {current_count} oral exam questions about "{question}".
+Context ONLY.
 
-                prompt = f"""### SYSTEM:
-You are an academic examiner. Generate ONLY from the context.
-NO Biology/Science if context is Geography.
+### TEXT:
+{context[:3000]}
 
-### INSTRUCTION:
-Generate {current_batch_count} DIFFERENT questions about: "{topic_hint}".
-Base them ONLY on the TEXTBOOK CONTEXT below.
-
-### CONSTRAINTS:
-- Topic: {topic_hint}
-- Diversify: Covered topics so far: {", ".join([q['question'][:30] for q in all_questions]) if all_questions else "None"}. Do NOT repeat these.
-- Focus: Pick {current_batch_count} DIFFERENT facts/terms from the context.
-- Uniqueness: Each question must have a unique answer.
-
-### TEXTBOOK CONTEXT:
-{context[:4000]}
-
-### EXAMPLE JSON (STRICT FORMAT):
+### OUTPUT (JSON):
 [
   {{
     "question": "Explain the process of photosynthesis.",
     "sample_answer": "Plants convert sunlight into energy.",
     "rubric": "Mentions sunlight, chlorophyll, and energy conversion."
   }}
-]
-
-### ORAL TEST QUESTIONS OUTPUT (JSON):"""
-
-                response_text = self.call_llama_optimized(prompt, num_predict=800, temperature=0.1, format="json") # Reduced from 2000, added format="json"
+]"""
+            
+            response = self.call_llama_optimized(prompt, num_predict=1500, temperature=0.1, format="json")
+            
+            try:
+                # Clean & Parsse
+                clean = response
+                if "```json" in clean: clean = clean.split("```json")[-1].split("```")[0]
+                elif "```" in clean: clean = clean.split("```")[-1].split("```")[0]
                 
-                try:
-                    # Robust JSON extraction
-                    import json
-                    import re
+                start = clean.find('[')
+                end = clean.rfind(']')
+                if start != -1 and end != -1:
+                    clean = clean[start:end+1]
+                    data = json.loads(clean)
                     
-                    json_data = None
-                    try:
-                        # Attempt 1: Direct parse
-                        json_data = json.loads(response_text)
-                    except:
-                        # Attempt 2: Extract block
-                        start_idx = response_text.find('[')
-                        end_idx = response_text.rfind(']')
-                        if start_idx != -1 and end_idx != -1:
-                            json_blob = response_text[start_idx:end_idx+1]
-                            json_data = json.loads(json_blob)
-                        else:
-                            # Attempt 3: Look for object if no list
-                            start_obj = response_text.find('{')
-                            end_obj = response_text.rfind('}')
-                            if start_obj != -1 and end_obj != -1:
-                                json_blob = response_text[start_obj:end_obj+1]
-                                json_data = json.loads(json_blob)
-                    
-                    if json_data:
-                        # Normalize to list
-                        batch_qs = []
-                        if isinstance(json_data, list):
-                            batch_qs = json_data
-                        elif isinstance(json_data, dict):
-                            # Handle common patterns like {"questions": [...]} or {"oral_test": [...]}
-                            for key in ["questions", "oral_test", "data", "result"]:
-                                if key in json_data and isinstance(json_data[key], list):
-                                    batch_qs = json_data[key]
-                                    break
-                            if not batch_qs:
-                                # Could be a single object
-                                if 'question' in json_data:
-                                    batch_qs = [json_data]
-
-                        # Validation & Integration
-                        pass_success = False
+                    if isinstance(data, list):
                         new_batch = []
-                        # Pre-calculate normalized forms of existing questions for efficiency
-                        seen_q_norms = {re.sub(r'[^\w\s]', '', prev['question'].lower().strip()) for prev in all_questions}
-                        seen_a_norms = {prev['sample_answer'].lower().strip()[:40] for prev in all_questions}
-                        
-                        for q in batch_qs:
-                            if isinstance(q, dict) and 'question' in q and 'sample_answer' in q:
-                                # Normalization for duplicate detection
-                                q_norm = re.sub(r'[^\w\s]', '', q['question'].lower().strip())
-                                a_norm = q['sample_answer'].lower().strip()[:40] # Check first 40 chars of answer
-                                
-                                # Check against already saved questions AND currently adding ones
-                                pending_q_norms = {re.sub(r'[^\w\s]', '', p['question'].lower().strip()) for p in new_batch}
-                                pending_a_norms = {p['sample_answer'].lower().strip()[:40] for p in new_batch}
-                                
-                                # If question phrasing OR the answer is a duplicate, skip it
-                                if q_norm in seen_q_norms or q_norm in pending_q_norms:
-                                    print(f"⚠️ redundant phrasing: {q['question'][:30]}...")
-                                    continue
-                                if a_norm in seen_a_norms or a_norm in pending_a_norms:
-                                    print(f"⚠️ redundant fact: same answer as previous question.")
-                                    continue
-                                    
+                        for q in data:
+                            if 'question' in q and 'sample_answer' in q:
+                                # Simple dedup
+                                if any(x['question'][:10] == q['question'][:10] for x in all_questions): continue
                                 q['id'] = len(all_questions) + len(new_batch) + 1
                                 new_batch.append(q)
-                        
-                        if new_batch:
-                            all_questions.extend(new_batch)
-                            pass_success = True
-                        
-                        if pass_success:
-                            if len(batch_qs) < current_batch_count:
-                                print(f"⚠️ AI generated only {len(batch_qs)}/{current_batch_count} questions. Retrying pass...")
-                                pass_success = False
-                                # Continue to next retry_idx
-                            else:
-                                break # Success! Exit retry loop
-                        else:
-                            print(f"⚠️ Pass {pass_idx+1}, Attempt {retry_idx+1}: Valid JSON but missing required fields.")
-                    else:
-                        print(f"⚠️ Pass {pass_idx+1}, Attempt {retry_idx+1}: Could not find JSON in response.")
-                        print(f"DEBUG RAW RESPONSE: {response_text[:200]}...")
-                except Exception as e:
-                    print(f"❌ JSON Parse failed in Oral Test Pass {pass_idx+1}, Attempt {retry_idx+1}: {e}")
-                    # print(f"DEBUG RAW RESPONSE: {response_text[:200]}...")
+                        all_questions.extend(new_batch)
+            except Exception as e:
+                print(f"   ⚠️ Pass {p+1} JSON error: {e}")
 
-            # --- FALLBACK: If batch generation failed to reach count, generate one-by-one ---
-            remaining_to_fill = current_batch_count - len(new_batch)
-            if remaining_to_fill > 0:
-                print(f"🔄 Pass {pass_idx+1} incomplete ({len(new_batch)}/{current_batch_count}). Falling back to one-by-one generation for {remaining_to_fill} questions...")
-                for f_idx in range(remaining_to_fill):
-                    print(f"   🔹 Generating individual fallback question {f_idx + 1}/{remaining_to_fill}...")
-                    
-                    fallback_prompt = f"""### SYSTEM:
-Academic examiner. Topic: {topic_hint}. Context ONLY.
-AVOID repeating: {", ".join([q['question'][:30] for q in all_questions + new_batch]) if (all_questions or new_batch) else "None"}
+        # 4. Translate Result
+        if self.language == 'telugu' and all_questions:
+            print("🔄 Translating Oral Test to Telugu...")
+            all_questions = self.translate_structure(all_questions, 'telugu')
 
-### INSTRUCTION:
-Generate ONE unique oral exam question about: "{topic_hint}".
-Base it ONLY on the TEXTBOOK CONTEXT.
-Cover a different fact than: {", ".join([q['question'][:30] for q in all_questions + new_batch]) if (all_questions or new_batch) else "None"}.
-
-### FORMAT:
-{{
-  "question": "[Unique question]",
-  "sample_answer": "[Canonical answer]",
-  "type": "explanation"
-}}
-
-### TEXTBOOK CONTEXT:
-{context[:3000]}
-
-### OUTPUT (JSON OBJECT ONLY):"""
-                    
-                    try:
-                        f_response = self.call_llama_optimized(fallback_prompt, num_predict=300, temperature=0.3, format="json")
-                        # Simple extract object
-                        s = f_response.find('{')
-                        e_idx = f_response.rfind('}')
-                        if s != -1 and e_idx != -1:
-                            f_item = json.loads(f_response[s:e_idx+1])
-                            if 'question' in f_item and 'sample_answer' in f_item:
-                                f_item['id'] = len(all_questions) + 1
-                                all_questions.append(f_item)
-                                print(f"   ✅ Fallback question generated successfully.")
-                    except Exception as fe:
-                        print(f"   ❌ Fallback failed: {fe}")
-
-        oral_duration = time.time() - oral_start
-        print(f"⏱️ Total Oral Test generation completed in {oral_duration:.2f}s")
-        
-        if not all_questions:
-            return [], [], "error"
-
+        if not all_questions: return [], [], "error"
         return all_questions, [], "oral_test"
 
     def generate_mindmap_response(self, book_id: str, language: str = 'en'):
-        """Generates a hierarchical mind map structure for a book."""
+        """Generates a hierarchical mind map structure (English -> Translated)."""
         print(f"🧠 Generating Mind Map for book_id: {book_id}...")
         
         # 1. Retrieve Context
-        filter_dict = {"book_id": book_id}
         try:
-            # Fetch top 12 chunks for broad coverage (approx 5000 chars)
-            relevant_docs = self.vectorstore.similarity_search("Main concepts and structure of this chapter", k=12, filter=filter_dict)
-            context = "\n\n".join([doc.page_content for doc in relevant_docs])
-            
-            if not context or len(context.strip()) < 200:
-                print("⚠️ Insufficient context for Mind Map.")
-                return {"error": "Insufficient content found for this book."}, [], "error"
+            docs = self.vectorstore.similarity_search("Main concepts and structure", k=12, filter={"book_id": book_id})
+            context = "\n\n".join([doc.page_content for doc in docs])
+            if not context: return {"error": "Content not found."}, [], "error"
         except Exception as e:
-            print(f"⚠️ Vector search failed for Mind Map: {e}")
-            return {"error": "Database error retrieving content."}, [], "error"
+            return {"error": "Database error."}, [], "error"
 
-        # 2. Robust Line-Based Prompting (No JSON)
-        # We ask for a simple text format that 1.5B models can handle perfectly.
+        # 2. English Prompt (Line-Based)
         prompt = f"""### SYSTEM:
-You are an expert curriculum designer. Create a hierarchical mind map.
-Use the following EXACT format:
+Create a hierarchical mind map in English.
+Format:
 ROOT: [Chapter Title]
-SUBTOPIC: [Unique Main Branch Name]
+SUBTOPIC: [Main Branch]
 CONCEPT: [Key Concept]
 DETAIL: [Brief Detail]
-CONNECTION: [Related Concept Name]
 
 Rules:
-1. **NO QUESTIONS**. Use clear NOUN PHRASES for all headings (e.g., "Water Distribution" instead of "How is water distributed?").
-2. **DIVERSITY**. Generate EXACTLY 10-12 unique Subtopics covering the **entire** chapter.
-3. **DEPTH**. Each Subtopic MUST have 3-5 Concepts.
-4. **NO DUPLICATES**. Do not repeat branch names.
-5. **START IMMEDIATELY** with 'ROOT:'.
+- NO questions.
+- 5-8 Subtopics.
+- 3 Concepts per Subtopic.
 
-Example:
-ROOT: Earth's Atmosphere
-SUBTOPIC: Layers
-CONCEPT: Troposphere
-DETAIL: Weather occurs here
-CONCEPT: Stratosphere
-DETAIL: Contains ozone layer
-SUBTOPIC: Composition
-CONCEPT: Nitrogen
-DETAIL: 78% of atmosphere
-
-### INPUT TEXT:
+### TEXT:
 {context[:6000]}
 
 ### MIND MAP OUTPUT:"""
 
         # 3. Generation
-        print(f"🧠 Generating Mind Map (Line-Based Strategy)...")
-        # Kept temp at 0.4 for creativity, but the prompt example guides structure
-        response_text = self.call_llama_optimized(prompt, num_predict=3000, temperature=0.4, format=None)
+        response_text = self.call_llama_optimized(prompt, num_predict=3000, temperature=0.4)
         
-        # 4. Robust Line-Based Parser
+        # 4. Parse
         try:
-            lines = response_text.split('\n')
-            
-            # Data Structure
-            mind_map = {
-                "title": "Mind Map",
-                "subtopics": []
-            }
-            
-            current_subtopic = None
-            current_concept = None
+            mind_map = {"title": "Mind Map", "subtopics": []}
+            curr_sub = None
+            curr_con = None
             
             seen_ids = set()
-            seen_subtopic_names = set()
-            
-            def generate_id(prefix):
-                 new_id = f"{prefix}_{len(seen_ids)}"
-                 seen_ids.add(new_id)
-                 return new_id
+            def gid(p): 
+                ni = f"{p}_{len(seen_ids)}"
+                seen_ids.add(ni)
+                return ni
 
-            for line in lines:
+            for line in response_text.split('\n'):
                 line = line.strip()
                 if not line: continue
                 
-                # Parse Line Types
                 if line.startswith("ROOT:"):
-                    title = line.replace("ROOT:", "").strip()
-                    if title: mind_map["title"] = title
-                    
+                    mind_map["title"] = line.replace("ROOT:", "").strip()
                 elif line.startswith("SUBTOPIC:"):
-                    name = line.replace("SUBTOPIC:", "").strip()
-                    name_lower = name.lower()
-                    
-                    # DEDUPLICATION CHECK
-                    if name and name_lower not in seen_subtopic_names:
-                        seen_subtopic_names.add(name_lower)
-                        
-                        current_subtopic = {
-                            "id": generate_id("st"),
-                            "name": name,
-                            "concepts": []
-                        }
-                        mind_map["subtopics"].append(current_subtopic)
-                        current_concept = None # Reset concept context
-                    else:
-                        current_subtopic = None # Skip duplicates
-                        
-                elif line.startswith("CONCEPT:"):
-                    if current_subtopic: # Only add if we are in a valid (non-duplicate) subtopic
-                        name = line.replace("CONCEPT:", "").strip()
-                        # Concept Dedup within subtopic (optional but good)
-                        existing_Concepts = [c['name'].lower() for c in current_subtopic['concepts']]
-                        
-                        if name and name.lower() not in existing_Concepts:
-                            current_concept = {
-                                "id": generate_id("c"),
-                                "name": name,
-                                "details": [],
-                                "connections": []
-                            }
-                            current_subtopic["concepts"].append(current_concept)
-                        else:
-                            current_concept = None
-                        
-                elif line.startswith("DETAIL:"):
-                    if current_concept:
-                        text = line.replace("DETAIL:", "").strip()
-                        if text and len(current_concept["details"]) < 3: # Limit details
-                            current_concept["details"].append(text)
+                    curr_sub = {"id": gid("st"), "name": line.replace("SUBTOPIC:", "").strip(), "concepts": []}
+                    mind_map["subtopics"].append(curr_sub)
+                    curr_con = None
+                elif line.startswith("CONCEPT:") and curr_sub:
+                    curr_con = {"id": gid("c"), "name": line.replace("CONCEPT:", "").strip(), "details": [], "connections": []}
+                    curr_sub["concepts"].append(curr_con)
+                elif line.startswith("DETAIL:") and curr_con:
+                    curr_con["details"].append(line.replace("DETAIL:", "").strip())
 
-            # Validation
-            if not mind_map["subtopics"]:
-                 print("⚠️ Parser found no subtopics. Fallback to raw text.")
-                 # Create a dummy structure from raw text if parsing failed completely
-                 mind_map["subtopics"] = [{
-                     "id": "st_error",
-                     "name": "Key Concepts",
-                     "concepts": [{"id": "c_err", "name": "Content", "details": [response_text[:100] + "..."]}]
-                 }]
+            # 5. Translate
+            if language == 'telugu': # Use passed language arg or self.language
+                print("🔄 Translating Mind Map to Telugu...")
+                # self.language is reliable here
+                if self.language == 'telugu':
+                    mind_map = self.translate_structure(mind_map, 'telugu')
 
-            print(f"✅ Generated Mind Map '{mind_map.get('title')}' with {len(mind_map['subtopics'])} branches.")
             return mind_map, [], "mindmap"
 
         except Exception as e:
-            print(f"❌ Mind Map Parsing failed: {e}")
+            print(f"❌ Mind Map error: {e}")
             return {"error": "Parsing error."}, [], "error"
 
     def transcribe_file(self, audio_path):
         """Transcribe an audio file using the local Whisper model."""
         if not hasattr(self, 'whisper_model') or self.whisper_model is None:
-            self.setup_telugu_asr_offline()
+            self.setup_asr_offline() # Correct method name
         
         if not self.asr_available:
             return None, "ASR not available"
             
         try:
             print(f"🎤 Transcribing audio: {audio_path}")
-            # Use English if not specified, but Whisper detects automatically
             segments, info = self.whisper_model.transcribe(audio_path, beam_size=5)
             transcript = " ".join([segment.text for segment in segments]).strip()
             print(f"📄 Transcription complete: {transcript[:50]}...")
@@ -1746,292 +1730,118 @@ DETAIL: 78% of atmosphere
             return None, str(e)
 
     def analyze_oral_transcript(self, question, sample_answer, transcript):
-        """AI Auto-Review of Oral Test transcript using LLM comparison."""
-        if not transcript or len(transcript.strip()) < 2:
-            return {
-                "score": 1,
-                "feedback": "No clear response detected in the audio.",
-                "confidence": "high",
-                "keywords_detected": []
-            }
-
-        # Step 1: Extract Keywords from Sample Answer for Coverage Analysis (Internal LLM step or simple regex)
-        # We'll ask the LLM to do it as part of the main analysis for efficiency
+        """AI Auto-Review of Oral Test transcript."""
+        # This returns JSON so we can translate feedback if needed
+        # Logic remains mostly same, just checking language at end
         
-        prompt = f"""### INSTRUCTION:
-You are an expert oral exam reviewer. Your task is to evaluate a student's spoken response (transcript) against a canonical sample answer.
+        prompt = f"""Evaluate response.
+QUESTION: {question}
+ANSWER: {sample_answer}
+STUDENT: {transcript}
 
-### EVALUATION CRITERIA:
-1. Accuracy: Does the transcript contain the correct information?
-2. Completeness: Were the key concepts from the sample answer mentioned?
-3. Keywords: Did the student use the essential terms?
-
-### INPUT:
-- QUESTION: {question}
-- CANONICAL ANSWER: {sample_answer}
-- STUDENT TRANSCRIPT: {transcript}
-
-### OUTPUT FORMAT (STRICT JSON):
+OUTPUT JSON:
 {{
-  "score": (Integer 1-5),
-  "feedback": (Short, encouraging feedback string),
-  "confidence": ("low" | "medium" | "high"),
-  "keywords_detected": [List of key terms found in the transcript]
-}}
-
-### ANALYSIS:"""
+  "score": (1-5),
+  "feedback": "Short feedback string",
+  "confidence": "high",
+  "keywords_detected": []
+}}"""
 
         try:
-            response_text = self.call_llama_optimized(prompt, num_predict=1000, temperature=0.1)
-            
-            # Robust JSON extraction
+            response = self.call_llama_optimized(prompt, num_predict=1000, temperature=0.1, format="json")
             import json
-            import re
+            clean = response
+            if "```json" in clean: clean = clean.split("```json")[-1].split("```")[0]
+            elif "```" in clean: clean = clean.split("```")[-1].split("```")[0]
             
-            clean_text = response_text.strip()
-            # Handle markdown code blocks
-            if "```json" in clean_text:
-                clean_text = clean_text.split("```json")[-1].split("```")[0]
-            elif "```" in clean_text:
-                clean_text = clean_text.split("```")[-1].split("```")[0]
+            clean = clean[clean.find('{'):clean.rfind('}')+1]
+            analysis = json.loads(clean)
             
-            start_idx = clean_text.find('{')
-            end_idx = clean_text.rfind('}')
-            
-            if start_idx != -1 and end_idx != -1:
-                json_blob = clean_text[start_idx:end_idx+1]
-                # Repair trailing commas and other common issues
-                json_blob = re.sub(r',\s*([\]}])', r'\1', json_blob)
-                analysis = json.loads(json_blob)
+            if self.language == 'telugu':
+                analysis = self.translate_structure(analysis, 'telugu')
                 
-                # Validation
-                if 'score' not in analysis: analysis['score'] = 3
-                if 'feedback' not in analysis: analysis['feedback'] = "Review complete."
-                if 'confidence' not in analysis: analysis['confidence'] = "medium"
-                if 'keywords_detected' not in analysis: analysis['keywords_detected'] = []
-                
-                return analysis
-            else:
-                return {
-                    "score": 3,
-                    "feedback": "AI was unable to generate a detailed review, but the response was recorded.",
-                    "confidence": "low",
-                    "keywords_detected": []
-                }
-        except Exception as e:
-            print(f"❌ AI Analysis error: {e}")
-            return {
-                "score": 0,
-                "feedback": f"Review engine error: {str(e)}",
-                "confidence": "low",
-                "keywords_detected": []
-            }
+            return analysis
+        except:
+             return {"score": 3, "feedback": "Review failed to parse.", "confidence": "low", "keywords_detected": []}
 
     def generate_one_page_revision_response(self, book_id: str, language: str = 'en'):
-        """
-        Generates a STRICT Single-Page Revision Sheet.
-        Uses Line-Based Parsing Strategy for 1.5B model robustness.
-        """
-        print(f"🧠 Generating One-Page Revision for book_id: {book_id}...")
+        """Generates a Single-Page Revision Sheet (English -> Translated)."""
+        print(f"🧠 Generating Revision Sheet for book_id: {book_id}...")
         
         try:
-            # 0. Check VectorStore
-            if not self.vectorstore:
-                print("❌ Vectorstore is None! Embeddings not initialized.")
-                return {"status": "error", "response": "System initializing, please wait."}
-
-            # 1. Retrieve Context
-            # We fetch chunks focusing on the core topic
-            docs = self.vectorstore.similarity_search(
-                f"summary case study important facts definitions impacts for book {book_id}",
-                k=12,
-                filter={"book_id": book_id}
-            )
-            if not docs:
-                return {"status": "error", "response": "No content found for this book."}
-                
-            full_text = "\n".join([d.page_content for d in docs])
-            context = full_text[:5000]
+            docs = self.vectorstore.similarity_search(f"summary case study for book {book_id}", k=12, filter={"book_id": book_id})
+            if not docs: return {"status": "error", "response": "No content."}, [], "revision"
+            context = "\n".join([d.page_content for d in docs])[:5000]
             
-            # 2. Strict Template Prompt
+            # English Prompt
             prompt = f"""### SYSTEM:
-You are an expert tutor. Fill out this EXACT Revision Sheet Template for the given text.
-Use the following format (Line-Based). DO NOT skip any section.
-
-LESSON_TITLE: [Chapter Name/Title]
-SOURCE: [Source Material/Book Context]
-IMPORTANT_DATE: [Key Dates or Time Period]
+Fill out this EXACT Revision Sheet Template in English.
+LESSON_TITLE: [Title]
+SOURCE: [Source]
+IMPORTANT_DATE: [Dates]
 BACKGROUND:
-- [Background point 1 (Full Sentence)]
-- [Background point 2 (Full Sentence)]
+- [Point 1]
 KEY_INFORMATION:
-- [Fact 1: Must be a full sentence with specific details]
-- [Fact 2: Must be a full sentence with specific details]
-- [Fact 3: Must be a full sentence with specific details]
+- [Fact 1]
 EFFECTS:
-- [Effect 1: Consequence (Full Sentence)]
-- [Effect 2: Consequence (Full Sentence)]
+- [Effect 1]
 IMPORTANT_TERMS:
 - [Term 1] || [Definition 1]
-- [Term 2] || [Definition 2]
-- [Term 3] || [Definition 3]
-- [Term 4] || [Definition 4]
-- [Term 5] || [Definition 5]
 PRACTICE_QUESTIONS:
-- [Conceptual Question 1 (Start with 'Explain', 'Describe', 'Compare')]
-- [Conceptual Question 2]
-- [Conceptual Question 3]
-- [Conceptual Question 4]
-- [Conceptual Question 5]
+- [Question 1]
 
 Rules:
-1. **DENSITY**: Every bullet point must contain valid information. No empty or vague points.
-2. **NO ACTIVITY QUESTIONS**: NEVER ask to "Leaf through", "Find", "Draw", "Label", "On the map", or "Locate".
-3. **NO TEXTBOOK EXTRAS**: Do not include "Let us do", "Let us draw", "Chapter headers", or "Don't Miss Out" sections.
-4. **NO REPETITION**: Do NOT repeat the same fact in different sections. If you used a fact in 'Background', do NOT repeat it anywhere else.
-4. **FORMAT**: For IMPORTANT_TERMS, you MUST use the separator ' || ' between the term and meaning.
-5. **START IMMEDIATELY** with 'LESSON_TITLE:'.
-6. **CONCEPTUAL ONLY**: All questions must start with 'Why', 'How', 'Explain', 'Compare'.
+- NO "Activity" questions.
+- Conceptual questions only.
+- Full sentences.
 
 ### CONTEXT:
 {context}
 
 ### FILLED TEMPLATE:"""
 
-            # 3. Generation
-            print(f"🧠 Generating Case Study Revision Sheet...")
-            response_text = self.call_llama_optimized(prompt, num_predict=3000, temperature=0.1, format=None)
+            response_text = self.call_llama_optimized(prompt, num_predict=3000, temperature=0.1)
             
-            print(f"📄 RAW REVISION OUTPUT:\n{response_text[:500]}...\n-------------------")
+            # Parse
+            revision_data = {"topic": "", "where": "", "when": "", "why": [], "facts": [], "impacts": [], "keywords": [], "definitions": [], "exam_question": []}
+            curr_sect = None
             
-            # 4. Parsing to Strict JSON matching the Template
-            revision_data = {
-                "topic": "Topic",
-                "where": "",
-                "when": "",
-                "why": [],
-                "facts": [],
-                "impacts": [],
-                "keywords": [],
-                "definitions": [],
-                "exam_question": []
-            }
-            
-            current_section = None
-            
-            # Deduplication Helper: Normalize strings to catch almost-identical dupes
-            seen_content = set()
-            
-            def is_duplicate(text):
-                # Normalize: remove non-alphanumeric, lowercase
-                normalized = "".join(c for c in text if c.isalnum()).lower()
-                if normalized in seen_content:
-                    return True
-                seen_content.add(normalized)
-                return False
-
             for line in response_text.split('\n'):
                 line = line.strip()
-                # Robust cleaning: remove ** and other markers
-                clean_line_check = line.replace("*", "").replace("#", "").strip()
-                
                 if not line: continue
+                u_line = line.upper()
                 
-                # Case and Format Normalization for Headers
-                upper_line = clean_line_check.upper().replace(" ", "_").replace("-", "_")
+                if "LESSON_TITLE" in u_line: revision_data["topic"] = line.split(":", 1)[1].strip()
+                elif "SOURCE" in u_line: revision_data["where"] = line.split(":", 1)[1].strip()
+                elif "IMPORTANT_DATE" in u_line: revision_data["when"] = line.split(":", 1)[1].strip()
+                elif "BACKGROUND" in u_line: curr_sect = "why"
+                elif "KEY_INFORMATION" in u_line: curr_sect = "facts"
+                elif "EFFECTS" in u_line or "IMPACTS" in u_line: curr_sect = "impacts"
+                elif "IMPORTANT_TERMS" in u_line: curr_sect = "terms"
+                elif "PRACTICE_QUESTIONS" in u_line: curr_sect = "exam_question"
                 
-                if "LESSON_TITLE" in upper_line:
-                    revision_data["topic"] = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
-                    current_section = None
-                elif "SOURCE" in upper_line or "WHERE" in upper_line:
-                     revision_data["where"] = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
-                     current_section = None
-                elif "IMPORTANT_DATE" in upper_line:
-                    revision_data["when"] = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
-                    current_section = None
-                elif "BACKGROUND" in upper_line:
-                    content = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
-                    if content and not is_duplicate(content): revision_data["why"].append(content)
-                    current_section = "why"
-                elif "KEY_INFORMATION" in upper_line or "FACTS" in upper_line:
-                    content = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
-                    if content and not is_duplicate(content): revision_data["facts"].append(content)
-                    current_section = "facts"
-                elif "EFFECTS" in upper_line or "IMPACTS" in upper_line:
-                    content = clean_line_check.split(":", 1)[1].strip() if ":" in clean_line_check else ""
-                    if content and not is_duplicate(content): revision_data["impacts"].append(content)
-                    current_section = "impacts"
-                elif "IMPORTANT_TERMS" in upper_line or "KEY_DEFS" in upper_line:
-                    current_section = "key_defs"
-                elif "PRACTICE_QUESTIONS" in upper_line or "EXAM_QUESTIONS" in upper_line:
-                     current_section = "exam_question"
-                
-                elif current_section == "key_defs" and (":" in line or "||" in line or " - " in line):
-                    # Clean line (remove bullets if any)
-                    clean_content = line.lstrip("-•1234567890.) ").replace("**", "").strip()
-                    
-                    k, d = None, None
-                    if "||" in clean_content:
-                        parts = clean_content.split("||")
-                        k, d = parts[0].strip(), parts[1].strip()
-                    elif ":" in clean_content:
-                        parts = clean_content.split(":", 1)
-                        k, d = parts[0].strip(), parts[1].strip()
-                    elif " - " in clean_content:
-                         parts = clean_content.split(" - ", 1)
-                         k, d = parts[0].strip(), parts[1].strip()
-                    
-                    if k and d:
-                        if k not in revision_data["keywords"]:
-                             revision_data["keywords"].append(k)
-                             revision_data["definitions"].append(d)
-                
-                # Handle bullet points (generic)
-                elif line.startswith("-") or line.startswith("•") or (line[0].isdigit() and line[1] in ['.', ')']):
-                    content = line.lstrip("-•1234567890.) ").strip()
-                    if current_section and content:
-                        
-
-                        if isinstance(revision_data.get(current_section), list):
-                            # AGGRESSIVE QUESTION FILTERING
-                            if current_section == "exam_question":
-                                # 1. Hard Limit: Max 5 questions
-                                if len(revision_data["exam_question"]) >= 5:
-                                    continue
-
-                                # 2. Bad Start Patterns (Case Insensitive mostly)
-                                bad_starts = [
-                                    "Draw", "Label", "Solve", "Find", "Circle", "On the map", "Locate", 
-                                    "Explain the following terms", "Define the following", "Write short notes",
-                                    "Let us", "**", "Chapter", "Source", "Unit", "Don't Miss Out", "Activity",
-                                    "Then compare"
-                                ]
-                                if any(content.startswith(bad) for bad in bad_starts):
-                                    continue
-                                
-                                # 3. Heuristic: Too long (likely a context dump)
-                                if len(content) > 300:
-                                    continue
-
-                                # 4. Heuristic: Formatting junk
-                                if "pronounced" in content or "See Fig" in content:
-                                    continue
-
-                            if not is_duplicate(content):
-                                revision_data[current_section].append(content)
-
-            # Fallback
-            if not revision_data["facts"] and not revision_data["why"]:
-                 revision_data["why"].append("Could not generate structured data.")
-                 revision_data["why"].append("Please regenerate.")
+                elif curr_sect == "terms" and "||" in line:
+                    parts = line.lstrip("- ").split("||")
+                    if len(parts) == 2:
+                        revision_data["keywords"].append(parts[0].strip())
+                        revision_data["definitions"].append(parts[1].strip())
+                elif curr_sect and (line.startswith("-") or line.startswith("•")):
+                     content = line.lstrip("-• ").strip()
+                     if curr_sect == "exam_question" and len(revision_data["exam_question"]) < 5:
+                         revision_data["exam_question"].append(content)
+                     elif curr_sect in revision_data and isinstance(revision_data[curr_sect], list):
+                         revision_data[curr_sect].append(content)
+            
+            # Translate
+            if language == 'telugu' or self.language == 'telugu':
+                print("🔄 Translating Revision Sheet to Telugu...")
+                revision_data = self.translate_structure(revision_data, 'telugu')
 
             return revision_data, [], "revision"
             
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            print(f"❌ Revision Generation Error: {e}")
-            return {"status": "error", "response": f"Server error: {str(e)}"}, [], "revision"
+            print(f"❌ Revision Error: {e}")
+            return {"status": "error", "response": str(e)}, [], "revision"
 
     def get_response(self, question: str, selected_subjects: list = None, selected_books: list = None, mode: str = None):
         """SMART response routing with book-level scoping and intent-based optimization."""

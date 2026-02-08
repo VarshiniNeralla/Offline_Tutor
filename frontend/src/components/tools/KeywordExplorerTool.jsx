@@ -14,7 +14,8 @@ import {
     Trash2,
     Star,
     ShieldCheck,
-    Plus
+    Plus,
+    RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../../context/LanguageContext';
@@ -56,7 +57,7 @@ const KeywordExplorerTool = () => {
         fetchKeywords();
     }, [bookId]);
 
-    const fetchKeywords = async () => {
+    const fetchKeywords = async (forceRefresh = false) => {
         setIsLoading(true);
         setError(null);
         setProgress(0);
@@ -69,7 +70,7 @@ const KeywordExplorerTool = () => {
             const cacheKey = `keyword_history_${bookId}_v1`;
             const cached = localStorage.getItem(cacheKey);
 
-            if (cached) {
+            if (!forceRefresh && cached) {
                 const parsed = JSON.parse(cached);
                 if (parsed && parsed.data && parsed.data.length > 0) {
                     setKeywordsData(parsed.data);
@@ -85,7 +86,7 @@ const KeywordExplorerTool = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: "Generative Keyword Extraction",
+                    message: bookName ? `${bookName} Key Concepts` : "Important Definitions", // Improved Context
                     subjects: [subject],
                     book_ids: [bookId],
                     language: language,
@@ -218,45 +219,60 @@ const KeywordExplorerTool = () => {
                         </div>
                     </div>
 
-                    {/* Teacher Controls */}
-                    {role === 'teacher' && !isLoading && (
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            {isEditing ? (
-                                <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Regenerate Button */}
+                        {!isLoading && (
+                            <button
+                                onClick={() => fetchKeywords(true)}
+                                className="secondary-btn"
+                                style={{ padding: '8px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', height: '40px' }}
+                                title="Regenerate Keywords"
+                            >
+                                <RefreshCw size={18} />
+                                <span className="mobile-hide" style={{ fontSize: '0.9rem' }}>Regenerate</span>
+                            </button>
+                        )}
+
+                        {/* Teacher Controls */}
+                        {role === 'teacher' && !isLoading && (
+                            <>
+                                {isEditing ? (
+                                    <>
+                                        <button
+                                            className="secondary-btn"
+                                            onClick={() => { setIsEditing(false); fetchKeywords(); }} // Cancel reverts
+                                            style={{ padding: '8px 16px', borderRadius: '8px' }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            className="secondary-btn"
+                                            onClick={handleAddKeyword}
+                                            style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center', background: '#ecfdf5', color: '#059669', borderColor: '#10b981' }}
+                                        >
+                                            <Plus size={18} /> Add Term
+                                        </button>
+                                        <button
+                                            className="primary-btn"
+                                            onClick={handleSave}
+                                            disabled={!unsavedChanges}
+                                            style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}
+                                        >
+                                            <Save size={18} /> Save Changes
+                                        </button>
+                                    </>
+                                ) : (
                                     <button
                                         className="secondary-btn"
-                                        onClick={() => { setIsEditing(false); fetchKeywords(); }} // Cancel reverts
-                                        style={{ padding: '8px 16px', borderRadius: '8px' }}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        className="secondary-btn"
-                                        onClick={handleAddKeyword}
-                                        style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center', background: '#ecfdf5', color: '#059669', borderColor: '#10b981' }}
-                                    >
-                                        <Plus size={18} /> Add Term
-                                    </button>
-                                    <button
-                                        className="primary-btn"
-                                        onClick={handleSave}
-                                        disabled={!unsavedChanges}
+                                        onClick={() => setIsEditing(true)}
                                         style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}
                                     >
-                                        <Save size={18} /> Save Changes
+                                        <Edit3 size={18} /> Edit Keywords
                                     </button>
-                                </>
-                            ) : (
-                                <button
-                                    className="secondary-btn"
-                                    onClick={() => setIsEditing(true)}
-                                    style={{ padding: '8px 16px', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}
-                                >
-                                    <Edit3 size={18} /> Edit Keywords
-                                </button>
-                            )}
-                        </div>
-                    )}
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
             </header>
 

@@ -257,5 +257,54 @@
     "tokens": 134,
     "time": 35.76,
     "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-02-07 12:47:24",
+    "mode": "standard",
+    "tokens": 366,
+    "time": 89.32,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-02-07 13:06:01",
+    "mode": "standard",
+    "tokens": 600,
+    "time": 118.61,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-02-07 13:47:13",
+    "mode": "standard",
+    "tokens": 600,
+    "time": 117.3,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-02-07 13:58:04",
+    "mode": "standard",
+    "tokens": 600,
+    "time": 120.84,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-02-07 14:12:00",
+    "mode": "standard",
+    "tokens": 97,
+    "time": 44.31,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-02-07 14:15:46",
+    "mode": "standard",
+    "tokens": 163,
+    "time": 43.23,
+    "model": "qwen2.5:1.5b"
+  },
+  {
+    "timestamp": "2026-02-08 18:38:56",
+    "mode": "brief",
+    "tokens": 109,
+    "time": 42.92,
+    "model": "qwen2.5:1.5b"
   }
 ]

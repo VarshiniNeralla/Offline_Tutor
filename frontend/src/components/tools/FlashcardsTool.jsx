@@ -67,11 +67,21 @@ const FlashcardsTool = () => {
         setError(null);
 
         try {
+            // Get language name for the prompt
+            const languageNames = {
+                'en': 'English',
+                'te': 'Telugu',
+                'hi': 'Hindi',
+                'ta': 'Tamil',
+                'kn': 'Kannada'
+            };
+            const languageName = languageNames[language] || 'English';
+
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: `Generate ${cardCount} flashcards for ${bookName}`,
+                    message: `Generate exactly ${cardCount} flashcards in ${languageName} language for the book "${bookName}". All questions and answers must be in ${languageName}. Return exactly ${cardCount} flashcards, no more, no less.`,
                     subjects: [subject],
                     book_ids: [bookId],
                     mode: 'flashcards',
@@ -378,7 +388,7 @@ const FlashcardsTool = () => {
                                     {t.flash.howMany}
                                 </p>
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-                                    {[10, 20, 30].map(count => (
+                                    {[5, 10, 15].map(count => (
                                         <button
                                             key={count}
                                             onClick={() => setCardCount(count)}
