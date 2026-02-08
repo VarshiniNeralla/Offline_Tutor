@@ -1403,28 +1403,72 @@ Generate 5 questions now in this exact format:"""
             print(f"⚠️ Summary search failed: {e}")
             return "శోధన విఫలమైంది." if self.language == 'telugu' else "Search failed.", [], "summary"
 
-        # 2. English Prompt
-        prompt = f"""You are a Content Strategist. Summarize this content related to "{question}".
-STRUCTURE:
-1. Title: Professional title.
-2. Overview: 3-4 sentences.
-3. Section Breakdown: Use Headings.
-4. Key Takeaways: 5-8 bullet points.
-5. Important Terms: List with definitions.
+        # 2. Enhanced English Prompt with STRICT Markdown Structure
+        prompt = f"""Create a comprehensive educational summary about "{question}" using STRICT markdown formatting.
 
-RULES:
-- Simple language.
-- Use markdown headings (###) and lists (-).
-- NO hallucinations.
+EXACT FORMAT (use this structure):
 
-CONTENT:
+## Overview
+
+Write 2-3 complete sentences explaining what this chapter covers.
+
+## Key Facts
+
+📊 **Category Name**
+
+- First specific fact with data or numbers
+- Second specific fact with details
+- Third specific fact
+
+🌍 **Another Category**
+
+- First point with specific information
+- Second point with details
+- Third point
+
+## Important Terms
+
+**Term One**: Complete definition in one clear sentence.
+
+**Term Two**: Complete definition in one clear sentence.
+
+**Term Three**: Complete definition in one clear sentence.
+
+## Why This Matters
+
+✓ First practical application or importance
+
+✓ Second real-world relevance
+
+✓ Third connection to broader concepts
+
+---
+RULES (DO NOT OUTPUT):
+- NEVER use single # (H1 headers) - ONLY use ## (H2) for main sections
+- Subsections MUST use **bold text** format, NOT headers
+- MUST use dash (-) for bullets, NOT dots (•)
+- Each emoji MUST be on its own line followed by category name in **bold**
+- Each bullet point on separate line with line break before
+- Use actual data from textbook (numbers, dates, names)
+- NO instructional words like "discuss" or "explain"
+- Be specific and concise
+- Follow the EXACT format shown above
+
+TEXTBOOK CONTENT:
 {context}
 
-SUMMARY OUTPUT:"""
+---
+OUTPUT MARKDOWN ONLY:"""
 
-        print(f"📚 Generating Summary: {question[:60]}...")
-        response = self.call_llama_optimized(prompt, num_predict=2000, temperature=0.0)
-        
+        print(f"📚 Generating Enhanced Summary: {question[:60]}...")
+        response = self.call_llama_optimized(prompt, num_predict=3500, temperature=0.0)
+
+        # Clean up any leaked prompt artifacts
+        response = self._clean_summary_response(response)
+
+        # Normalize markdown structure before translation
+        response = self._normalize_markdown_structure(response)
+
         # 3. Translate if Telugu
         if self.language == 'telugu':
             print("🔄 Translating Summary to Telugu...")
@@ -1436,6 +1480,87 @@ SUMMARY OUTPUT:"""
              response = response[:11950] + "\n\n[Truncated]"
 
         return response, [], "summary"
+
+    def _clean_summary_response(self, response: str) -> str:
+        """Remove any leaked prompt artifacts from summary response."""
+        import re
+
+        # Remove common prompt leakage patterns
+        patterns_to_remove = [
+            r'CRITICAL RULES:.*?(?=\n#|\n\n[A-Z]|$)',  # Remove "CRITICAL RULES:" section
+            r'INSTRUCTIONS.*?(?=\n#|\n\n[A-Z]|$)',      # Remove "INSTRUCTIONS" section
+            r'TEXTBOOK CONTENT:.*?(?=\n#|\n\n[A-Z]|$)', # Remove "TEXTBOOK CONTENT:" section
+            r'GENERATE SUMMARY NOW:.*?(?=\n#|\n\n[A-Z]|$)',  # Remove "GENERATE SUMMARY NOW"
+            r'DO NOT INCLUDE IN OUTPUT:.*?(?=\n#|\n\n[A-Z]|$)',  # Remove instructions
+            r'FORMAT REQUIREMENTS:.*?(?=\n#|\n\n[A-Z]|$)',       # Remove format requirements
+            r'---\s*INSTRUCTIONS.*?---',                         # Remove markdown-style instruction blocks
+            r'Chapter \d+:.*?Explain what.*?(?=\n#|\n\n[A-Z]|$)',  # Remove raw textbook questions
+            r'Explain what .*?(?=\n|\.|$)',                      # Remove "Explain what" instructions
+            r'Discuss .*?(?=\n|\.|$)',                           # Remove "Discuss" instructions
+        ]
+
+        cleaned = response
+        for pattern in patterns_to_remove:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+
+        # Remove excessive newlines
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+
+        # Remove leading/trailing whitespace
+        cleaned = cleaned.strip()
+
+        return cleaned
+
+    def _normalize_markdown_structure(self, text: str) -> str:
+        """Ensure proper markdown structure for better rendering."""
+        import re
+
+        # CRITICAL: Only keep FIRST H1, convert all others to H2 for minimalist design
+        lines = text.split('\n')
+        found_h1 = False
+        normalized_lines = []
+
+        for line in lines:
+            # Check if line is an H1 (starts with single #)
+            if re.match(r'^#\s+[^#]', line):
+                if not found_h1:
+                    # Keep first H1 as is
+                    normalized_lines.append(line)
+                    found_h1 = True
+                else:
+                    # Convert subsequent H1s to H2
+                    normalized_lines.append('#' + line)  # Add extra # to make it H2
+            else:
+                normalized_lines.append(line)
+
+        text = '\n'.join(normalized_lines)
+
+        # Ensure h1 titles have proper spacing
+        text = re.sub(r'^#\s+([^#].+?)$', r'# \1\n', text, flags=re.MULTILINE)
+
+        # Ensure h2 headings have proper spacing
+        text = re.sub(r'^##\s*(.+?)$', r'\n## \1\n', text, flags=re.MULTILINE)
+
+        # Ensure emojis at start of line have proper spacing
+        emoji_pattern = r'^([📊🌍🔍🌊⚡✓💡🎯📚])\s*\*\*(.+?)\*\*'
+        text = re.sub(emoji_pattern, r'\n\1 **\2**\n', text, flags=re.MULTILINE)
+
+        # Convert bullet points: • to - and ensure proper spacing
+        text = re.sub(r'•\s*', '- ', text)
+
+        # Ensure bullet points have proper line breaks
+        text = re.sub(r'(?<!\n)-\s+', r'\n- ', text)
+
+        # Ensure checkmarks have proper spacing
+        text = re.sub(r'✓\s*', r'\n✓ ', text)
+
+        # Clean up excessive newlines (max 2)
+        text = re.sub(r'\n{3,}', '\n\n', text)
+
+        # Ensure terms definitions have proper spacing
+        text = re.sub(r'\*\*(.+?):\*\*\s*', r'\n**\1:** ', text)
+
+        return text.strip()
 
     def generate_flashcards_response(self, question: str, selected_subjects: list = None, selected_books: list = None):
         """Generates flashcards from textbook context (English -> Translated)."""

@@ -2522,5 +2522,124 @@
         "metadata": null,
         "attempt_id": "e2406930-6641-4764-8607-2d4a38dc0226",
         "timestamp": "2026-02-08T23:49:29.056203"
+    },
+    {
+        "type": "quiz",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 4,
+        "total_questions": 5,
+        "questions": [
+            {
+                "id": 1,
+                "question": "What is the largest ocean?",
+                "options": [
+                    "Pacific Ocean",
+                    "Atlantic Ocean",
+                    "Indian Ocean",
+                    "Arctic Ocean"
+                ],
+                "correct_index": 0,
+                "explanation": "The Pacific Ocean is the largest ocean covering about 165 million square kilometers.",
+                "user_answer": 0
+            },
+            {
+                "id": 2,
+                "question": "Which continent has the most countries?",
+                "options": [
+                    "Africa",
+                    "Asia",
+                    "Europe",
+                    "South America"
+                ],
+                "correct_index": 2,
+                "explanation": "Europe has 47 countries, more than any other continent.",
+                "user_answer": 0
+            },
+            {
+                "id": 3,
+                "question": "What is the smallest ocean?",
+                "options": [
+                    "Pacific Ocean",
+                    "Atlantic Ocean",
+                    "Indian Ocean",
+                    "Arctic Ocean"
+                ],
+                "correct_index": 3,
+                "explanation": "The Arctic Ocean is the smallest of all, covering about 14 million square kilometers.",
+                "user_answer": 3
+            },
+            {
+                "id": 4,
+                "question": "Which continent is often considered as a single continent?",
+                "options": [
+                    "Africa",
+                    "Asia",
+                    "Europe",
+                    "Australia"
+                ],
+                "correct_index": 0,
+                "explanation": "Africa and Eurasia are generally regarded as two continents, but sometimes as one.",
+                "user_answer": 0
+            },
+            {
+                "id": 5,
+                "question": "How many continents are commonly recognized in the world?",
+                "options": [
+                    "Four continents",
+                    "Five continents",
+                    "Six continents",
+                    "Seven continents"
+                ],
+                "correct_index": 3,
+                "explanation": "The last list of seven continents is the one most widely adopted and used.",
+                "user_answer": 3
+            }
+        ],
+        "metadata": null,
+        "attempt_id": "2766b4d6-6c67-49a9-97fb-164231d7e8e4",
+        "timestamp": "2026-02-08T23:52:09.556764"
+    },
+    {
+        "type": "oral_test",
+        "student_name": "Nisha",
+        "student_class": "Class 6",
+        "subject": "Social",
+        "book_id": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+        "book_name": "Oceans and Continents",
+        "score": 0,
+        "total_questions": 3,
+        "status": "IN_PROGRESS",
+        "metadata": {
+            "mode": "practice",
+            "questions": [
+                {
+                    "id": 1,
+                    "question": "What are continents and oceans, and how do they impact life on Earth?",
+                    "sample_answer": "Continents are large landmasses that cover most of the surface of the Earth. Oceans are vast bodies of saltwater that cover about seven-tenths of the planet's surface. Both play crucial roles in supporting marine life and influencing global climate patterns.",
+                    "rubric": "['Explain what continents and oceans are', 'Describe their distribution on Earth']",
+                    "audio_url": "/api/oral_audio/b9f1b17f-cf01-48e8-83c3-b0a34fb5bb70/q_0.webm"
+                },
+                {
+                    "id": 2,
+                    "question": "How do oceans connect, and how many major ocean basins can be identified?",
+                    "sample_answer": "Oceans are interconnected through the water cycle, which includes evaporation, condensation, precipitation, and collection back into bodies of water. The five major ocean basins recognized by most geographers are the Pacific Ocean, Atlantic Ocean, Indian Ocean, Arctic Ocean, and Southern Ocean.",
+                    "rubric": "['Describe how oceans connect', 'Identify the five major ocean basins']",
+                    "audio_url": "/api/oral_audio/b9f1b17f-cf01-48e8-83c3-b0a34fb5bb70/q_1.webm"
+                },
+                {
+                    "id": 3,
+                    "question": "What is the difference between an ocean and a sea?",
+                    "sample_answer": "An ocean is a large body of saltwater that covers most of Earth's surface, while a sea is a smaller body of water that is partially enclosed by land. Oceans are generally larger in size compared to seas.",
+                    "rubric": "['Define the difference between an ocean and a sea']"
+                }
+            ],
+            "start_time": "Sun 02/08/2026"
+        },
+        "attempt_id": "b9f1b17f-cf01-48e8-83c3-b0a34fb5bb70",
+        "timestamp": "2026-02-08T23:59:06.432366"
     }
 ]

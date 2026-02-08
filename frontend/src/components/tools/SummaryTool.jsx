@@ -81,8 +81,13 @@ const SummaryTool = () => {
     }, [bookId, CACHE_KEY, navigate, role]);
 
     const generateSummary = async (isRegeneration = false) => {
-        if (isRegeneration && !window.confirm("Generate a new AI draft? This will become the active version for students until you review it.")) {
-            return;
+        if (isRegeneration) {
+            const confirmMsg = role === 'teacher'
+                ? "Generate a new AI draft? This will become the active version for students until you review it."
+                : "Regenerate summary? This will create a new version based on the textbook content.";
+            if (!window.confirm(confirmMsg)) {
+                return;
+            }
         }
 
         setIsLoading(true);
@@ -305,12 +310,14 @@ const SummaryTool = () => {
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{bookName}</p>
                         </div>
                     </div>
-                    {role === 'teacher' && displayHistory.length > 0 && !isLoading && !isEditing && (
+                    {displayHistory.length > 0 && !isLoading && !isEditing && (
                         <div style={{ display: 'flex', gap: '12px' }}>
-                            <button className="delete-btn-top" onClick={() => handleDelete(currentIndex)} title="Delete Version">
-                                <Trash2 size={18} />
-                            </button>
-                            <button className="regenerate-btn-top" onClick={() => generateSummary(true)} title="New AI Draft">
+                            {role === 'teacher' && (
+                                <button className="delete-btn-top" onClick={() => handleDelete(currentIndex)} title="Delete Version">
+                                    <Trash2 size={18} />
+                                </button>
+                            )}
+                            <button className="regenerate-btn-top" onClick={() => generateSummary(true)} title={role === 'teacher' ? 'New AI Draft' : 'Regenerate Summary'}>
                                 <RefreshCw size={18} />
                             </button>
                         </div>
@@ -401,8 +408,13 @@ const SummaryTool = () => {
                                         </div>
                                     ) : (
                                         <div className="scroll-content-v2" style={{ flex: 1, overflowY: 'auto' }}>
-                                            <div className="markdown-container">
-                                                <ReactMarkdown>{currentSummary.text}</ReactMarkdown>
+                                            <div className="markdown-container clean-typography">
+                                                <ReactMarkdown>
+                                                    {currentSummary.text
+                                                        .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Remove emojis
+                                                        .replace(/[\u{2700}-\u{27BF}]/gu, '') // Remove dingbats
+                                                    }
+                                                </ReactMarkdown>
                                             </div>
 
                                             <div className="summary-footer-v2">
@@ -535,55 +547,190 @@ const styles = `
 .status-label-v2.draft { background: #fef2f2; color: #dc2626; }
 .summary-version-tag { font-size: 0.8rem; color: #94a3b8; font-weight: 600; }
 
-.scroll-content-v2 { flex: 1; overflow-y: auto; padding: 40px 60px; line-height: 1.8; }
+.scroll-content-v2 {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 48px;
+    line-height: 1.7;
+    background: rgba(255,255,255,0.6);
+}
 .scroll-content-v2::-webkit-scrollbar { width: 8px; }
-.scroll-content-v2::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+.scroll-content-v2::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 8px;
+}
+.scroll-content-v2::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 8px;
+}
+.scroll-content-v2::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
 
-.markdown-container h1 { font-size: 2.2rem; color: #1e1b4b; background: linear-gradient(90deg, var(--primary), #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 32px; font-weight: 900; }
+/* Responsive padding for smaller screens */
+@media (max-width: 768px) {
+    .scroll-content-v2 {
+        padding: 20px 16px;
+    }
+}
+
+/* Clean Typography Theme */
+.clean-typography {
+    font-family: 'Outfit', sans-serif;
+    color: #334155;
+}
+
+.clean-typography h1 {
+    font-size: 1.8rem;
+    color: #1e1b4b;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e0e7ff;
+    font-weight: 800;
+    line-height: 1.3;
+}
+
+.clean-typography h2 {
+    font-size: 1.3rem;
+    color: #1e293b;
+    margin-top: 32px;
+    margin-bottom: 16px;
+    padding-left: 12px;
+    border-left: 4px solid #6366f1; /* Indigo accent */
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.clean-typography h3 {
+    font-size: 1.1rem;
+    color: #475569;
+    margin-top: 24px;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.clean-typography p {
+    margin-bottom: 16px;
+    line-height: 1.75;
+    color: #334155;
+    font-size: 1.05rem;
+}
+
+/* Neat Bullets */
+.clean-typography ul, .clean-typography ol {
+    padding-left: 20px;
+    margin-bottom: 20px;
+}
+
+.clean-typography li {
+    margin-bottom: 10px;
+    line-height: 1.6;
+    padding-left: 8px;
+    position: relative;
+}
+
+.clean-typography ul li::marker {
+    color: #6366f1; /* Indigo bullet */
+    font-size: 1.1em;
+}
+
+/* Definition lists / Key Terms */
+.clean-typography strong {
+    color: #0f172a;
+    font-weight: 700;
+    background: linear-gradient(120deg, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    background-repeat: no-repeat;
+    background-size: 100% 40%;
+    background-position: 0 88%;
+    padding: 0 2px;
+}
+
+.clean-typography blockquote {
+    background: #f8fafc;
+    border-left: 4px solid #cbd5e1;
+    padding: 16px 20px;
+    margin: 24px 0;
+    font-style: italic;
+    color: #475569;
+    border-radius: 0 8px 8px 0;
+}
 
 .summary-footer-v2 {
-    margin-top: 40px; padding-top: 32px; border-top: 1px dotted #e2e8f0;
+    margin-top: 40px; 
+    padding-top: 24px; 
+    border-top: 1px solid #e2e8f0;
     display: flex; justify-content: space-between; align-items: center;
 }
 
 .author-info { display: flex; align-items: center; gap: 12px; }
-.avatar-mini { width: 32px; height: 32px; background: #e0e7ff; color: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; }
-.by-text { font-size: 0.9rem; font-weight: 700; color: #1e1b4b; margin: 0; }
-.time-text { font-size: 0.75rem; color: #94a3b8; margin: 0; }
+.avatar-mini { 
+    width: 36px; height: 36px; 
+    background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); 
+    color: #4338ca; 
+    border-radius: 10px; 
+    display: flex; align-items: center; justify-content: center; 
+    font-weight: 700; 
+    font-size: 0.9rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.by-text { font-size: 0.95rem; font-weight: 700; color: #1e293b; margin: 0; }
+.time-text { font-size: 0.8rem; color: #64748b; margin: 0; }
 
 .edit-fab {
-    background: white; border: 1px solid var(--border); padding: 10px 20px;
-    border-radius: 14px; color: var(--primary); font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; gap: 8px; transition: all 0.2s;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    background: white; border: 1px solid #e2e8f0; 
+    padding: 8px 20px;
+    border-radius: 20px; 
+    color: #334155; 
+    font-weight: 600; 
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px; 
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
-.edit-fab:hover { background: var(--primary); color: white; transform: scale(1.05); }
+.edit-fab:hover { 
+    border-color: #6366f1; color: #6366f1; 
+    background: #eff6ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(99, 102, 241, 0.1);
+}
 
 .edit-view-v2 { padding: 32px; }
 .edit-textarea-v2 {
-    flex: 1; border: 2px solid #f1f5f9; border-radius: 20px; padding: 24px;
-    font-family: inherit; font-size: 1.1rem; line-height: 1.6; resize: none;
-    outline: none; transition: border-color 0.2s; background: #f8fafc;
+    flex: 1; border: 2px solid #e2e8f0; border-radius: 16px; padding: 24px;
+    font-family: 'Outfit', sans-serif; font-size: 1.05rem; line-height: 1.7; resize: none;
+    outline: none; transition: all 0.2s; background: white;
+    color: #1e293b;
 }
-.edit-textarea-v2:focus { border-color: var(--primary); background: white; }
+.edit-textarea-v2:focus { 
+    border-color: #6366f1; 
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
 
 .edit-actions-footer { margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; }
-.cancel-pill { background: #f1f5f9; color: #64748b; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 700; cursor: pointer; }
-.save-pill { background: var(--primary); color: white; border: none; padding: 12px 32px; border-radius: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 10px 20px rgba(79, 70, 229, 0.2); }
+.cancel-pill { 
+    background: white; color: #64748b; border: 1px solid #e2e8f0; 
+    padding: 10px 24px; border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.2s; 
+}
+.cancel-pill:hover { background: #f8fafc; color: #0f172a; }
 
-/* REUSE OLD BUTTON STYLES FOR TOP HEADER */
-.delete-btn-top {
-    background: white; border: 1px solid var(--border);
-    width: 40px; height: 40px; border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    color: #ef4444; cursor: pointer; transition: all 0.2s;
+.save-pill { 
+    background: #6366f1; color: white; border: none; 
+    padding: 10px 32px; border-radius: 20px; font-weight: 600; cursor: pointer; 
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transition: all 0.2s;
 }
-.regenerate-btn-top {
-    background: white; border: 1px solid var(--border);
-    width: 40px; height: 40px; border-radius: 12px;
+.save-pill:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4); background: #4f46e5; }
+
+/* Top Header Buttons */
+.delete-btn-top, .regenerate-btn-top {
+    background: white; border: 1px solid #e2e8f0;
+    width: 36px; height: 36px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+    color: #64748b; cursor: pointer; transition: all 0.2s;
 }
+.delete-btn-top:hover { background: #fef2f2; color: #ef4444; border-color: #fecaca; }
+.regenerate-btn-top:hover { background: #eff6ff; color: #3b82f6; border-color: #bfdbfe; }
 `;
+
 
 export default SummaryTool;
