@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations';
 import '../../assets/styles/student-dashboard.css';
+import ToolProcessingAnimation from './ToolProcessingAnimation';
 
 const KeywordExplorerTool = () => {
     const location = useLocation();
@@ -279,7 +280,7 @@ const KeywordExplorerTool = () => {
             <main className="dashboard-container" style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' }}>
 
                 {isLoading ? (
-                    <LoadingView progress={progress} />
+                    <ToolProcessingAnimation title={t.keywords.analyzing} status={t.keywords.extractionDesc} />
                 ) : error ? (
                     <ErrorView message={error} onRetry={fetchKeywords} />
                 ) : (
@@ -302,26 +303,7 @@ const KeywordExplorerTool = () => {
 };
 
 // Sub-components
-const LoadingView = ({ progress }) => {
-    const { language } = useLanguage();
-    const t = translations[language];
-    return (
-        <div style={{ textAlign: 'center', padding: '60px' }}>
-            <div className="spinner-large" style={{ margin: '0 auto 24px' }}>
-                <Brain size={40} className="zap-spin" style={{ color: 'var(--primary)' }} />
-            </div>
-            <h3>{t.keywords.analyzing}</h3>
-            <p style={{ marginBottom: '20px' }}>{t.keywords.extractionDesc}</p>
-            <div className="progress-container-v2" style={{ margin: '0 auto', maxWidth: '300px', background: '#e2e8f0', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
-                <div
-                    className="progress-fill-v2"
-                    style={{ width: `${progress}%`, height: '100%', background: 'var(--primary)', transition: 'width 0.3s ease' }}
-                />
-            </div>
-            <p style={{ marginTop: '10px', fontWeight: 600, color: 'var(--primary)' }}>{progress}%</p>
-        </div>
-    );
-};
+
 
 const ErrorView = ({ message, onRetry }) => {
     const { language } = useLanguage();

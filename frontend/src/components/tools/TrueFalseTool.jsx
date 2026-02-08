@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations';
 import '../../assets/styles/student-dashboard.css';
+import ToolProcessingAnimation from './ToolProcessingAnimation';
 
 const TrueFalseTool = () => {
     const location = useLocation();
@@ -335,13 +336,7 @@ const TrueFalseTool = () => {
                     )}
 
                     {view === 'LOADING' && (
-                        <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="loading-view" style={{ textAlign: 'center', padding: '100px 0' }}>
-                            <div className="spinner-large" style={{ margin: '0 auto 24px' }}>
-                                <Brain size={48} className="zap-spin" style={{ color: 'var(--primary)' }} />
-                            </div>
-                            <h3>{t.tf.analyzing}</h3>
-                            <p>{t.tf.crafting}</p>
-                        </motion.div>
+                        <ToolProcessingAnimation key="loading" title={t.tf.analyzing} status={t.tf.crafting} />
                     )}
 
                     {view === 'ERROR' && (

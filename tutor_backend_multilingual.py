@@ -133,11 +133,13 @@ class AITextbookTutorMultilingualBackendOffline:
                 print("💻 Using CPU. Transcription will be slower but accurate.")
 
             # Set model name (will be loaded on first transcription)
+            # Use 'large' model for Telugu transcription accuracy
+            # 'large' is 1.5GB but provides much better Telugu transcription
             self.whisper_model_name = "large"
             self.whisper_model = None  # Lazy load on first use
             self.asr_available = True
             self.asr_error = None
-            print(f"✅ ASR Ready! Will use '{self.whisper_model_name}' model")
+            print(f"✅ ASR Ready! Will use '{self.whisper_model_name}' model (best for Telugu)")
 
         except Exception as e:
             print(f"❌ ASR setup completely failed: {e}")
@@ -1572,68 +1574,161 @@ CRITICAL RULES:
             print(f"⚠️ Vector search failed: {e}")
             return [], [], "error"
 
-        # 2. Count
+        # 2. Count - Extract the FIRST number from the question
         import re
         match = re.search(r'(\d+)', question)
         q_count = int(match.group(1)) if match else 5
         q_count = min(max(q_count, 3), 15)
+        print(f"📊 Target oral test question count: {q_count}")
 
         # 3. Generation Loop (English Only)
         all_questions = []
         batch_size = 5
-        passes = (q_count + batch_size - 1) // batch_size
-        
+        passes = (q_count + batch_size - 1) // batch_size + 2  # Add extra passes for safety
+
         for p in range(passes):
-            current_count = min(batch_size, q_count - len(all_questions))
-            
-            prompt = f"""### SYSTEM:
-Generate {current_count} oral exam questions about "{question}".
-Context ONLY.
+            if len(all_questions) >= q_count:
+                print(f"✅ Reached target count: {len(all_questions)}/{q_count}")
+                break
+
+            needed = min(batch_size, q_count - len(all_questions))
+            print(f"   🔹 Pass {p+1}: Need {needed} more questions (currently have {len(all_questions)})...")
+
+            prompt = f"""### INSTRUCTION:
+Generate EXACTLY {needed + 1} high-quality ORAL exam questions from the text below.
+These are ORAL questions - students will SPEAK their answers, not write or draw anything.
+
+CRITICAL RULES:
+1. Each "question" MUST be ANSWERABLE BY SPEAKING (no drawing, writing, labeling, mapping)
+2. Each "question" MUST be a COMPLETE question (minimum 5 words)
+3. Each "sample_answer" MUST be a COMPLETE spoken answer (minimum 5 words)
+4. Each "rubric" should list key points to check in student's VERBAL answer
+5. Questions must test understanding through EXPLANATION, DESCRIPTION, or DISCUSSION
+6. NO questions asking to: draw, sketch, map, label, write, fill in blanks, or point to things
+7. Base all content on the provided TEXT
 
 ### TEXT:
-{context[:3000]}
+{context[:4000]}
 
-### OUTPUT (JSON):
+### GOOD ORAL QUESTIONS (Students can answer by speaking):
 [
   {{
-    "question": "Explain the process of photosynthesis.",
-    "sample_answer": "Plants convert sunlight into energy.",
-    "rubric": "Mentions sunlight, chlorophyll, and energy conversion."
+    "question": "Explain the water cycle and describe its main stages.",
+    "sample_answer": "The water cycle involves evaporation from water bodies, condensation into clouds, precipitation as rain or snow, and collection back into water bodies.",
+    "rubric": "Should mention evaporation, condensation, precipitation, and the cyclical nature"
+  }},
+  {{
+    "question": "Name the seven continents and describe where they are located on Earth.",
+    "sample_answer": "The seven continents are Asia, Africa, North America, South America, Antarctica, Europe, and Australia. Asia and Europe are in the eastern hemisphere, while North and South America are in the western hemisphere.",
+    "rubric": "Should name all seven continents and mention their general locations"
+  }},
+  {{
+    "question": "What are the differences between oceans and seas?",
+    "sample_answer": "Oceans are larger bodies of salt water that cover most of Earth's surface, while seas are smaller and are usually partially enclosed by land. Oceans include the Pacific, Atlantic, Indian, Arctic, and Southern Ocean.",
+    "rubric": "Should mention size difference and that seas are more enclosed"
   }}
-]"""
-            
-            response = self.call_llama_optimized(prompt, num_predict=1500, temperature=0.1, format="json")
-            
+]
+
+### BAD ORAL QUESTIONS (NEVER DO THIS - These require physical actions):
+[
+  {{"question": "Draw the continents on paper", "sample_answer": "...", "rubric": "..."}},
+  {{"question": "Label all oceans on the map", "sample_answer": "...", "rubric": "..."}},
+  {{"question": "Write the names of five countries", "sample_answer": "...", "rubric": "..."}},
+  {{"question": "Sketch a diagram of the water cycle", "sample_answer": "...", "rubric": "..."}}
+]
+
+### NOW GENERATE {needed + 1} COMPLETE ORAL QUESTIONS (ANSWERABLE BY SPEAKING) IN JSON FORMAT:"""
+
+            response = self.call_llama_optimized(prompt, num_predict=2000, temperature=0.2, format="json")
+
             try:
-                # Clean & Parsse
+                # Clean & Parse
                 clean = response
                 if "```json" in clean: clean = clean.split("```json")[-1].split("```")[0]
                 elif "```" in clean: clean = clean.split("```")[-1].split("```")[0]
-                
+
                 start = clean.find('[')
                 end = clean.rfind(']')
                 if start != -1 and end != -1:
                     clean = clean[start:end+1]
+                    clean = re.sub(r',\s*\]', ']', clean)  # trailing comma fix
                     data = json.loads(clean)
-                    
+
                     if isinstance(data, list):
-                        new_batch = []
                         for q in data:
+                            if len(all_questions) >= q_count:
+                                break
+
                             if 'question' in q and 'sample_answer' in q:
+                                question_text = str(q['question']).strip()
+                                answer_text = str(q['sample_answer']).strip()
+
+                                # VALIDATION 1: Reject incomplete questions
+                                if len(question_text.split()) < 4 or len(answer_text.split()) < 4:
+                                    print(f"   ⚠️ Rejected incomplete question: '{question_text[:40]}'")
+                                    continue
+
+                                # VALIDATION 2: Check for truncation
+                                if question_text.endswith('...') or answer_text.endswith('...'):
+                                    print(f"   ⚠️ Rejected truncated question: '{question_text[:40]}'")
+                                    continue
+
+                                # VALIDATION 3: Reject questions requiring physical actions (not oral)
+                                physical_action_keywords = [
+                                    'draw', 'sketch', 'label', 'map', 'write', 'fill in', 'fill out',
+                                    'mark', 'circle', 'underline', 'point to', 'show on', 'trace',
+                                    'color', 'shade', 'diagram on paper', 'on the map', 'on paper',
+                                    'గీయండి', 'వ్రాయండి', 'చూపించండి', 'మ్యాప్', 'కాగితం',  # Telugu keywords
+                                    'రేఖాచిత్రం', 'లేబుల్'
+                                ]
+                                question_lower = question_text.lower()
+                                if any(keyword in question_lower for keyword in physical_action_keywords):
+                                    print(f"   ⚠️ Rejected non-oral question (requires physical action): '{question_text[:50]}'")
+                                    continue
+
                                 # Simple dedup
-                                if any(x['question'][:10] == q['question'][:10] for x in all_questions): continue
-                                q['id'] = len(all_questions) + len(new_batch) + 1
-                                new_batch.append(q)
-                        all_questions.extend(new_batch)
+                                if any(x['question'][:15] == question_text[:15] for x in all_questions):
+                                    continue
+
+                                # Add validated question
+                                validated_q = {
+                                    'id': len(all_questions) + 1,
+                                    'question': question_text,
+                                    'sample_answer': answer_text,
+                                    'rubric': str(q.get('rubric', 'Check understanding of key concepts')).strip()
+                                }
+                                all_questions.append(validated_q)
+                                print(f"   ✅ Added question #{len(all_questions)}: '{question_text[:45]}...'")
+
             except Exception as e:
                 print(f"   ⚠️ Pass {p+1} JSON error: {e}")
+                import traceback
+                traceback.print_exc()
 
-        # 4. Translate Result
+        # 4. Translate Result with Better Context
         if self.language == 'telugu' and all_questions:
-            print("🔄 Translating Oral Test to Telugu...")
-            all_questions = self.translate_structure(all_questions, 'telugu')
+            print(f"🔄 Translating {len(all_questions)} Oral Test Questions to Telugu (batched for quality)...")
+            try:
+                translated_questions = []
+                for i, q in enumerate(all_questions):
+                    print(f"   Translating question {i+1}/{len(all_questions)}...")
+                    translated_q = {
+                        'id': q['id'],
+                        'question': self.translate_text(q['question'], 'english', 'telugu'),
+                        'sample_answer': self.translate_text(q['sample_answer'], 'english', 'telugu'),
+                        'rubric': self.translate_text(q['rubric'], 'english', 'telugu')
+                    }
+                    translated_questions.append(translated_q)
+                all_questions = translated_questions
+                print(f"✅ Translation complete!")
+            except Exception as e:
+                print(f"⚠️ Translation failed, using English: {e}")
 
-        if not all_questions: return [], [], "error"
+        if not all_questions:
+            print("❌ Failed to generate any valid questions")
+            return [], [], "error"
+
+        print(f"✅ Generated {len(all_questions)} oral test questions.")
         return all_questions, [], "oral_test"
 
     def generate_mindmap_response(self, book_id: str, language: str = 'en'):
@@ -1713,56 +1808,152 @@ Rules:
 
     def transcribe_file(self, audio_path):
         """Transcribe an audio file using the local Whisper model."""
-        if not hasattr(self, 'whisper_model') or self.whisper_model is None:
-            self.setup_asr_offline() # Correct method name
-        
+        # Ensure ASR is set up
+        if not hasattr(self, 'asr_available') or not self.asr_available:
+            self.setup_asr_offline()
+
         if not self.asr_available:
             return None, "ASR not available"
-            
+
         try:
             print(f"🎤 Transcribing audio: {audio_path}")
-            segments, info = self.whisper_model.transcribe(audio_path, beam_size=5)
-            transcript = " ".join([segment.text for segment in segments]).strip()
-            print(f"📄 Transcription complete: {transcript[:50]}...")
+
+            # LAZY LOAD: Load Whisper model if not already loaded
+            if self.whisper_model is None:
+                import whisper
+                device = "cuda" if self.has_cuda else "cpu"
+                model_name = getattr(self, 'whisper_model_name', 'base')
+
+                print(f"🔄 Loading OpenAI Whisper '{model_name}' model (first use)...")
+
+                try:
+                    # Load the large model for Telugu transcription accuracy
+                    self.whisper_model = whisper.load_model(model_name, device=device)
+                    print(f"✅ OpenAI Whisper '{model_name}' model loaded on {device.upper()}!")
+                except Exception as e:
+                    # Don't fallback to tiny - it doesn't work well for Telugu
+                    print(f"❌ Failed to load '{model_name}' model: {e}")
+                    print(f"⚠️ Note: Only 'large' model works well for Telugu transcription")
+                    print(f"⚠️ Please ensure you have a stable internet connection to download the model")
+                    return None, f"Failed to load Whisper model: {str(e)}"
+
+            # OpenAI Whisper returns a dictionary, not (segments, info)
+            # Use appropriate language based on current language setting
+            language_code = 'te' if self.language == 'telugu' else 'en'
+
+            # OPTIMIZED FOR TELUGU: OpenAI Whisper has excellent Telugu support
+            print(f"🎯 Transcribing in {self.language.upper()} (language code: {language_code})...")
+
+            result = self.whisper_model.transcribe(
+                audio_path,
+                language=language_code,  # 'te' for Telugu, 'en' for English
+                task="transcribe",
+                verbose=False,
+                fp16=self.has_cuda,  # Use FP16 if GPU available
+                # Optimized parameters for better Telugu accuracy
+                temperature=0.0,  # Deterministic for consistency
+                best_of=5,  # Sample multiple times for best result
+                beam_size=5  # Beam search for higher accuracy
+            )
+
+            transcript = result["text"].strip()
+
+            # Validate Telugu script if language is Telugu
+            if self.language == 'telugu' and transcript:
+                has_telugu = any('\u0c00' <= char <= '\u0c7f' for char in transcript)
+                if has_telugu:
+                    print(f"✅ Telugu script validated in transcript")
+                elif len(transcript) > 10:
+                    print(f"⚠️ Warning: No Telugu script detected, might be English/numbers")
+
+            print(f"📄 Transcription complete ({len(transcript)} chars): {transcript[:60]}...")
             return transcript, None
         except Exception as e:
             print(f"❌ Transcription error: {e}")
+            import traceback
+            traceback.print_exc()
             return None, str(e)
 
     def analyze_oral_transcript(self, question, sample_answer, transcript):
-        """AI Auto-Review of Oral Test transcript."""
-        # This returns JSON so we can translate feedback if needed
-        # Logic remains mostly same, just checking language at end
-        
-        prompt = f"""Evaluate response.
-QUESTION: {question}
-ANSWER: {sample_answer}
-STUDENT: {transcript}
+        """AI Auto-Review of Oral Test transcript (Works for Telugu and English)."""
+        # Build language-aware prompt
+        lang_note = ""
+        if self.language == 'telugu':
+            lang_note = "NOTE: The student's answer is in TELUGU. Compare meaning, not exact wording."
+        else:
+            lang_note = "NOTE: The student's answer is in ENGLISH. Compare meaning, not exact wording."
 
-OUTPUT JSON:
+        prompt = f"""You are an educational assessment AI. Evaluate the student's oral answer.
+
+{lang_note}
+
+QUESTION: {question}
+EXPECTED ANSWER: {sample_answer}
+STUDENT'S ANSWER: {transcript}
+
+SCORING CRITERIA:
+- Score 5: Excellent - Covers all key points accurately
+- Score 4: Good - Covers most key points with minor gaps
+- Score 3: Satisfactory - Covers some key points, missing important details
+- Score 2: Poor - Minimal understanding, many gaps
+- Score 1: Incorrect - Major misunderstanding or irrelevant
+
+IMPORTANT:
+- Focus on MEANING and CONCEPTS, not exact words
+- Be lenient with pronunciation variations in transcription
+- Award points for partial understanding
+- If answer is very short/unclear, give score 2-3
+
+OUTPUT ONLY THIS JSON FORMAT:
 {{
-  "score": (1-5),
-  "feedback": "Short feedback string",
-  "confidence": "high",
-  "keywords_detected": []
+  "score": <1-5>,
+  "feedback": "<Brief constructive feedback in English>",
+  "confidence": "<high/medium/low>",
+  "keywords_detected": ["<key concepts mentioned>"]
 }}"""
 
         try:
-            response = self.call_llama_optimized(prompt, num_predict=1000, temperature=0.1, format="json")
+            print(f"🤖 Analyzing answer in {self.language}...")
+            response = self.call_llama_optimized(prompt, num_predict=1200, temperature=0.1, format="json")
             import json
+
+            # Clean JSON
             clean = response
             if "```json" in clean: clean = clean.split("```json")[-1].split("```")[0]
             elif "```" in clean: clean = clean.split("```")[-1].split("```")[0]
-            
-            clean = clean[clean.find('{'):clean.rfind('}')+1]
+
+            # Extract JSON object
+            start = clean.find('{')
+            end = clean.rfind('}')
+            if start != -1 and end != -1:
+                clean = clean[start:end+1]
+
             analysis = json.loads(clean)
-            
-            if self.language == 'telugu':
-                analysis = self.translate_structure(analysis, 'telugu')
-                
+
+            # Validate score
+            if not isinstance(analysis.get("score"), (int, float)) or not (1 <= analysis["score"] <= 5):
+                analysis["score"] = 3
+
+            # Translate feedback to Telugu if needed
+            if self.language == 'telugu' and analysis.get("feedback"):
+                try:
+                    analysis["feedback"] = self.translate_text(analysis["feedback"], 'english', 'telugu')
+                except:
+                    pass  # Keep English feedback if translation fails
+
+            print(f"✅ AI Analysis: Score {analysis['score']}/5, Confidence: {analysis.get('confidence', 'medium')}")
             return analysis
-        except:
-             return {"score": 3, "feedback": "Review failed to parse.", "confidence": "low", "keywords_detected": []}
+
+        except Exception as e:
+            print(f"⚠️ Analysis parsing error: {e}")
+            # Return neutral score if analysis fails
+            feedback = "AI analysis unavailable - needs manual review" if self.language == 'english' else "AI విశ్లేషణ అందుబాటులో లేదు - మాన్యువల్ సమీక్ష అవసరం"
+            return {
+                "score": 3,
+                "feedback": feedback,
+                "confidence": "low",
+                "keywords_detected": []
+            }
 
     def generate_one_page_revision_response(self, book_id: str, language: str = 'en'):
         """Generates a Single-Page Revision Sheet (English -> Translated)."""

@@ -180,9 +180,9 @@ const MyProgress = () => {
                                             </div>
 
                                             <div style={{ textAlign: 'right' }}>
-                                                {attempt.status === "PENDING_REVIEW" ? (
+                                                {["PENDING_REVIEW", "PENDING_PROCESSING", "PENDING_MANUAL_REVIEW", "NO_AUDIO"].includes(attempt.status) ? (
                                                     <div style={{ padding: '4px 12px', borderRadius: '8px', background: '#fffbeb', color: '#b45309', fontSize: '0.75rem', fontWeight: 700 }}>
-                                                        {t.progress.pendingReview}
+                                                        {attempt.status === "NO_AUDIO" ? "No Audio" : t.progress.pendingReview}
                                                     </div>
                                                 ) : attempt.status === "AI_REVIEWED" ? (
                                                     <div style={{ padding: '4px 12px', borderRadius: '8px', background: '#e0f2fe', color: '#0369a1', fontSize: '0.75rem', fontWeight: 700 }}>
@@ -224,7 +224,7 @@ const MyProgress = () => {
                                     <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
                                         {selectedAttempt.type === 'flashcards'
                                             ? `${selectedAttempt.metadata?.known_count || 0}/${selectedAttempt.total_questions}`
-                                            : (selectedAttempt.status === 'PENDING_REVIEW' ? '---' : `${selectedAttempt.score}/${selectedAttempt.total_questions * (selectedAttempt.type === 'oral_test' ? 5 : 1)}`)}
+                                            : (["PENDING_REVIEW", "PENDING_PROCESSING", "PENDING_MANUAL_REVIEW", "NO_AUDIO"].includes(selectedAttempt.status) ? '---' : `${selectedAttempt.score}/${selectedAttempt.total_questions * (selectedAttempt.type === 'oral_test' ? 5 : 1)}`)}
                                     </div>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                                         {selectedAttempt.type === 'flashcards' ? t.progress.mastered : (selectedAttempt.status === 'AI_REVIEWED' ? `${t.progress.score} (AI)` : t.progress.score)}
@@ -235,7 +235,7 @@ const MyProgress = () => {
                                     <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
                                         {selectedAttempt.type === 'flashcards'
                                             ? Math.round(((selectedAttempt.metadata?.known_count || 0) / selectedAttempt.total_questions) * 100)
-                                            : (selectedAttempt.status === 'PENDING_REVIEW' ? '0' : Math.round((selectedAttempt.score / (selectedAttempt.total_questions * (selectedAttempt.type === 'oral_test' ? 5 : 1))) * 100))}%
+                                            : (["PENDING_REVIEW", "PENDING_PROCESSING", "PENDING_MANUAL_REVIEW", "NO_AUDIO"].includes(selectedAttempt.status) ? '0' : Math.round((selectedAttempt.score / (selectedAttempt.total_questions * (selectedAttempt.type === 'oral_test' ? 5 : 1))) * 100))}%
                                     </div>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                                         {selectedAttempt.status === 'AI_REVIEWED' ? `${t.progress.accuracy} (AI)` : t.progress.accuracy}
@@ -246,7 +246,7 @@ const MyProgress = () => {
                                     <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
                                         {selectedAttempt.metadata?.duration_seconds
                                             ? `${Math.floor(selectedAttempt.metadata.duration_seconds / 60)}m ${Math.floor(selectedAttempt.metadata.duration_seconds % 60)}s`
-                                            : (selectedAttempt.status === "PENDING_REVIEW" ? t.progress.pendingReview : (selectedAttempt.status === "AI_REVIEWED" ? t.progress.aiReviewed : "Reviewed"))}
+                                            : (["PENDING_REVIEW", "PENDING_PROCESSING", "PENDING_MANUAL_REVIEW"].includes(selectedAttempt.status) ? t.progress.pendingReview : (selectedAttempt.status === "NO_AUDIO" ? "No Audio" : (selectedAttempt.status === "AI_REVIEWED" ? t.progress.aiReviewed : "Reviewed")))}
                                     </div>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                                         {selectedAttempt.metadata?.duration_seconds ? t.progress.duration : t.progress.reviewStatus}
@@ -360,7 +360,7 @@ const MyProgress = () => {
                                                                 {q.feedback || "Review complete."}
                                                             </p>
                                                         </div>
-                                                    ) : (selectedAttempt.status === 'AI_REVIEWED' || q.ai_analysis) ? (
+                                                    ) : (q.ai_analysis) ? (
                                                         <div style={{ background: '#f0f9ff', padding: '20px', borderRadius: '16px', border: '1px solid #bae6fd' }}>
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -369,15 +369,15 @@ const MyProgress = () => {
                                                                 </div>
                                                                 <div style={{ display: 'flex', gap: '8px' }}>
                                                                     <div style={{ fontSize: '0.7rem', fontWeight: 700, background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '4px' }}>
-                                                                        Confidence: {q.ai_analysis.confidence}
+                                                                        Confidence: {q.ai_analysis?.confidence || '-'}
                                                                     </div>
                                                                     <div style={{ fontSize: '0.7rem', fontWeight: 700, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '4px' }}>
-                                                                        AI Score: {q.ai_analysis.score}/5
+                                                                        AI Score: {q.ai_analysis?.score || 0}/5
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                             <p style={{ fontSize: '0.95rem', color: '#0369a1', lineHeight: 1.5, margin: '0 0 12px' }}>
-                                                                {q.ai_analysis.feedback}
+                                                                {q.ai_analysis?.feedback || "No feedback available."}
                                                             </p>
                                                             <div style={{ fontSize: '0.75rem', padding: '10px', background: '#e0f2fe', borderRadius: '8px', border: '1px solid #bae6fd', color: '#0369a1' }}>
                                                                 ℹ️ <strong>Note:</strong> This is an AI-generated score for your reference. Your teacher will also evaluate your response, which you can check here later.
@@ -386,7 +386,9 @@ const MyProgress = () => {
                                                     ) : (
                                                         <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '16px', border: '1px solid #fde68a', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                             <Clock size={20} color="#b45309" />
-                                                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#92400e', fontWeight: 500 }}>{t.progress.pendingReview}.</p>
+                                                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#92400e', fontWeight: 500 }}>
+                                                                {selectedAttempt.status === "NO_AUDIO" ? "Audio file missing." : t.progress.pendingReview}
+                                                            </p>
                                                         </div>
                                                     )}
                                                 </div>

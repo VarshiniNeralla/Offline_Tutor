@@ -475,9 +475,9 @@ async def get_oral_audio(attempt_id: str, filename: str):
 
 @app.get("/api/oral_answers/list_pending")
 async def list_pending_reviews():
-    """Lists all oral tests that are finished but not reviewed."""
+    """Lists all oral tests that have been AI-reviewed or are pending review."""
     history = progress_manager._get_all_history()
-    pending = [r for r in history if r.get("type") == "oral_test" and r.get("status") in ["PENDING_REVIEW", "AI_REVIEWED", "AI_REVIEW_FAILED"]]
+    pending = [r for r in history if r.get("type") == "oral_test" and r.get("status") in ["PENDING_AI_REVIEW", "AI_REVIEWED", "AI_REVIEW_FAILED"]]
     return pending
 
 @app.post("/api/oral_test/review")
@@ -518,103 +518,150 @@ async def submit_oral_review(request: OralReviewRequest):
 
 @app.post("/api/oral_test/finish/{attempt_id}")
 async def finish_oral_test(attempt_id: str):
-    """Marks an in-progress oral test as pending review and triggers AI review queue."""
+    """Marks an in-progress oral test as pending AI review (automatic transcription and grading)."""
     try:
         history = progress_manager._get_all_history()
         for record in history:
             if record.get("attempt_id") == attempt_id:
-                record["status"] = "PENDING_REVIEW"
+                record["status"] = "PENDING_AI_REVIEW"
                 break
-        
+
         with open(progress_manager.storage_path, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=4, ensure_ascii=False)
-            
-        # Add to background processing queue
+
+        # Add to background AI review queue
         await oral_review_queue.put(attempt_id)
-        print(f"📥 Added attempt {attempt_id} to Oral Review queue")
-        
+        print(f"📥 Added attempt {attempt_id} to AI review queue (automatic grading)")
+
         return {"status": "success"}
     except Exception as e:
         print(f"❌ Error finishing oral test: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 async def process_oral_reviews():
-    """Background worker that transcribes and analyzes oral tests one by one."""
-    print("🤖 Oral Review Worker: Waiting for tasks...")
+    """Background worker that transcribes and AI-reviews oral tests automatically."""
+    print("🤖 Oral AI Review Worker: Starting...")
     while True:
         attempt_id = await oral_review_queue.get()
-        print(f"🤖 Processing Oral Review for attempt: {attempt_id}")
-        
+        print(f"🤖 Processing Oral Test with AI Review: {attempt_id}")
+
         try:
             # 1. Fetch record
             history = progress_manager._get_all_history()
             record = next((r for r in history if r.get("attempt_id") == attempt_id), None)
-            
+
             if not record or record.get("type") != "oral_test":
                 print(f"⚠️ Invalid record for attempt {attempt_id}")
                 oral_review_queue.task_done()
                 continue
 
-            # 2. Process each question
+            # 2. Process each question with AI transcription and analysis
             questions = record["metadata"].get("questions", [])
-            any_success = False
-            
+            successful_reviews = 0
+            total_score = 0
+
             for i, q in enumerate(questions):
                 audio_rel_url = q.get("audio_url")
                 if not audio_rel_url:
+                    print(f"⚠️ No audio for Q{i}, skipping...")
                     continue
-                
-                # Convert rel URL to local path
-                # URL is /api/oral_audio/{attempt_id}/q_{index}.{ext}
+
+                # Get audio file path
                 filename = audio_rel_url.split("/")[-1]
                 audio_path = os.path.join("data", "oral_tests", attempt_id, filename)
-                
-                if not os.path.exists(audio_path):
-                    print(f"⚠️ Audio file missing: {audio_path}")
-                    continue
-                
-                # A. Transcribe
-                transcript, error = tutor_backend.transcribe_file(audio_path)
-                if error:
-                    print(f"❌ Transcription failed for Q{i}: {error}")
-                    q["transcript"] = f"[Error: {error}]"
-                    continue
-                
-                q["transcript"] = transcript
-                
-                # B. Analyze (AI Feedback) - Retry once if it fails to get a good response
-                analysis = tutor_backend.analyze_oral_transcript(q["question"], q["sample_answer"], transcript)
-                if analysis.get('score') == 0 and "error" in analysis.get('feedback', '').lower():
-                    print(f"🔄 Retrying AI Analysis for Q{i}...")
-                    analysis = tutor_backend.analyze_oral_transcript(q["question"], q["sample_answer"], transcript)
-                
-                q["ai_analysis"] = analysis
-                any_success = True
-                print(f"✅ AI Review completed for Q{i} (Score: {analysis['score']})")
 
-            # 3. Update Status and Save
-            if any_success:
+                if not os.path.exists(audio_path):
+                    print(f"⚠️ Audio file missing for Q{i}: {audio_path}")
+                    q["ai_analysis"] = {
+                        "score": 0,
+                        "feedback": "Audio file not found",
+                        "confidence": "error"
+                    }
+                    continue
+
+                # A. Transcribe audio
+                print(f"🎤 Transcribing Q{i}...")
+                transcript, error = tutor_backend.transcribe_file(audio_path)
+
+                if error or not transcript:
+                    print(f"❌ Transcription failed for Q{i}: {error}")
+                    q["transcript"] = "[Transcription failed]"
+                    q["ai_analysis"] = {
+                        "score": 0,
+                        "feedback": f"Could not transcribe audio: {error}",
+                        "confidence": "error"
+                    }
+                    continue
+
+                q["transcript"] = transcript
+                print(f"✅ Transcribed Q{i}: {transcript[:60]}...")
+
+                # B. AI Analysis of transcript
+                print(f"🤖 AI analyzing Q{i}...")
+                try:
+                    analysis = tutor_backend.analyze_oral_transcript(
+                        q["question"],
+                        q["sample_answer"],
+                        transcript
+                    )
+
+                    # Validate analysis
+                    if not analysis or not isinstance(analysis, dict):
+                        analysis = {
+                            "score": 2,
+                            "feedback": "AI analysis unavailable, needs manual review",
+                            "confidence": "low"
+                        }
+
+                    q["ai_analysis"] = analysis
+                    total_score += analysis.get("score", 0)
+                    successful_reviews += 1
+                    print(f"✅ AI Review Q{i}: Score {analysis.get('score')}/5")
+
+                except Exception as e:
+                    print(f"❌ AI analysis failed for Q{i}: {e}")
+                    q["ai_analysis"] = {
+                        "score": 0,
+                        "feedback": "AI analysis error - needs manual review",
+                        "confidence": "error"
+                    }
+
+            # 3. Update status based on results
+            if successful_reviews > 0:
                 record["status"] = "AI_REVIEWED"
+                record["score"] = total_score
                 record["metadata"]["ai_reviewed"] = True
-                # Calculate total AI score and sync question count
-                questions_list = record["metadata"]["questions"]
-                total_ai_score = sum(q.get("ai_analysis", {}).get("score", 0) for q in questions_list)
-                record["score"] = total_ai_score
-                record["total_questions"] = len(questions_list)
+                record["metadata"]["successful_reviews"] = successful_reviews
+                record["metadata"]["note"] = f"AI reviewed {successful_reviews}/{len(questions)} questions"
+                print(f"✅ AI Review complete: {successful_reviews}/{len(questions)} questions, Score: {total_score}")
             else:
                 record["status"] = "AI_REVIEW_FAILED"
-                record["metadata"]["ai_review_error"] = "No audio files could be processed."
+                record["metadata"]["error"] = "All transcriptions/analyses failed"
+                print(f"❌ AI Review failed for all questions")
 
+            # Save results
             with open(progress_manager.storage_path, "w", encoding="utf-8") as f:
                 json.dump(history, f, indent=4, ensure_ascii=False)
-                
-            print(f"🤖 Finished background processing for {attempt_id}")
+
+            print(f"🤖 Finished AI processing for {attempt_id}")
 
         except Exception as e:
-            print(f"❌ Critical error in Oral Review Worker: {e}")
+            print(f"❌ Critical error in AI Review Worker: {e}")
             import traceback
             traceback.print_exc()
-        
+
+            # Mark as failed
+            try:
+                history = progress_manager._get_all_history()
+                record = next((r for r in history if r.get("attempt_id") == attempt_id), None)
+                if record:
+                    record["status"] = "AI_REVIEW_FAILED"
+                    record["metadata"]["error"] = str(e)
+                    with open(progress_manager.storage_path, "w", encoding="utf-8") as f:
+                        json.dump(history, f, indent=4, ensure_ascii=False)
+            except:
+                pass
+
         finally:
             oral_review_queue.task_done()
 

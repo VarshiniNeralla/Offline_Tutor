@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { translations } from '../../translations';
 import "../../assets/styles/mind-map.css";
+import ToolProcessingAnimation from './ToolProcessingAnimation';
 
 const MindMapTool = () => {
     const location = useLocation();
@@ -426,10 +427,8 @@ const MindMapTool = () => {
 
 
     if (loading && !mindMapData) return (
-        <div className="mm-center-msg">
-            <div className="mm-spinner"></div>
-            <p className="text-gray-600 font-medium">{t.mindmap.generating}</p>
-            <p className="text-gray-400 text-sm mt-2">{t.mindmap.analyzing}</p>
+        <div className="mm-center-msg" style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ToolProcessingAnimation title={t.mindmap.generating} status={t.mindmap.analyzing} />
         </div>
     );
 

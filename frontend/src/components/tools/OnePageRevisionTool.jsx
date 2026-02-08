@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { ArrowLeft, Printer, RefreshCw, BookOpen, AlertCircle } from 'lucide-react';
 import { translations } from '../../translations';
 import "../../index.css";
+import ToolProcessingAnimation from './ToolProcessingAnimation';
 
 const OnePageRevisionTool = () => {
     const location = useLocation();
@@ -332,88 +333,12 @@ const OnePageRevisionTool = () => {
 
     if (loading) return (
         <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(249, 250, 251, 0.95)',
-            backdropFilter: 'blur(4px)'
+            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'rgba(249, 250, 251, 0.95)', backdropFilter: 'blur(4px)'
         }}>
             <style>{styles}</style>
-
-            <div style={{
-                backgroundColor: 'white',
-                padding: '40px',
-                borderRadius: '24px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                width: '100%',
-                maxWidth: '450px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                border: '1px solid rgba(229, 231, 235, 1)'
-            }}>
-                {/* Scanner Animation */}
-                <div style={{
-                    position: 'relative',
-                    marginBottom: '24px',
-                    width: '64px',
-                    height: '64px'
-                }}>
-                    <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        border: '4px solid #f3f4f6',
-                        borderRadius: '50%'
-                    }}></div>
-                    <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        border: '4px solid #4f46e5',
-                        borderTopColor: 'transparent',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite'
-                    }}></div>
-                    <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}>
-                        <BookOpen size={24} color="#4f46e5" />
-                    </div>
-                </div>
-
-                <h3 style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 800,
-                    marginBottom: '8px',
-                    color: '#1f2937',
-                    fontFamily: 'sans-serif'
-                }}>{t.revision.synthesizing}</h3>
-
-                <p style={{
-                    color: '#6b7280',
-                    fontSize: '0.95rem'
-                }}>{statusMessage}</p>
-                <p style={{
-                    color: '#9ca3af',
-                    fontSize: '0.8rem',
-                    marginTop: '8px'
-                }}>{t.revision.takesMinute}</p>
-
-            </div>
-
-            <style>{`
-                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-            `}</style>
+            <ToolProcessingAnimation title={t.revision.synthesizing || "Synthesizing Revision Sheet..."} status={statusMessage} />
         </div>
     );
 

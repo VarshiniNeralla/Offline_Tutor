@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { translations } from "../../translations";
 import "../../assets/styles/student-dashboard.css";
+import ToolProcessingAnimation from "./ToolProcessingAnimation";
 
 const FlashcardsTool = () => {
     const navigate = useNavigate();
@@ -444,17 +445,11 @@ const FlashcardsTool = () => {
                     )}
 
                     {view === 'LOADING' && (
-                        <motion.div
+                        <ToolProcessingAnimation
                             key="loading"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            style={{ textAlign: 'center', padding: '60px 0' }}
-                        >
-                            <div className="loader" style={{ margin: '0 auto 24px' }}></div>
-                            <h3 style={{ fontSize: '1.4rem' }}>{t.flash.creatingDeck}</h3>
-                            <p style={{ color: 'var(--text-muted)' }}>{t.flash.reading}</p>
-                        </motion.div>
+                            title={t.flash.creatingDeck}
+                            status={t.flash.reading}
+                        />
                     )}
 
                     {view === 'STUDY' && (

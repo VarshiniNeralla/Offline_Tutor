@@ -18,6 +18,7 @@ import ReactMarkdown from 'react-markdown';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations';
 import '../../assets/styles/student-dashboard.css';
+import ToolProcessingAnimation from './ToolProcessingAnimation';
 
 const SummaryTool = () => {
     const location = useLocation();
@@ -35,30 +36,7 @@ const SummaryTool = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState("");
 
-    // Progress state for loading visualization
-    const [progress, setProgress] = useState(0);
 
-    useEffect(() => {
-        if (isLoading) {
-            setProgress(0);
-            const interval = setInterval(() => {
-                setProgress(prev => {
-                    if (prev >= 90) return 90; // Cap at 90% until done
-                    // Slower increment as it gets higher
-                    const chance = Math.random();
-                    let inc = 0;
-                    if (prev < 30) inc = 5;
-                    else if (prev < 60) inc = 3;
-                    else inc = 1;
-
-                    return Math.min(prev + inc, 90);
-                });
-            }, 500);
-            return () => clearInterval(interval);
-        } else {
-            setProgress(100);
-        }
-    }, [isLoading]);
     const [error, setError] = useState(null);
     const [isFromCache, setIsFromCache] = useState(false);
 
@@ -343,36 +321,11 @@ const SummaryTool = () => {
             <main className="dashboard-container" style={{ flex: 1, overflow: 'hidden', padding: '20px 0', display: 'flex', flexDirection: 'column', maxWidth: '1000px', margin: '0 auto', width: '100%', position: 'relative', zIndex: 1 }}>
                 <AnimatePresence mode="wait">
                     {isLoading ? (
-                        <motion.div
+                        <ToolProcessingAnimation
                             key="loading"
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="summary-loading-state"
-                            style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
-                        >
-                            <div style={{ width: '100%', maxWidth: '400px', margin: '0 auto', textAlign: 'center' }}>
-                                <div className="spinner-large" style={{ margin: '0 auto 24px' }}>
-                                    <Zap size={30} className="zap-spin" />
-                                </div>
-                                <h3 className="loading-text">{role === 'teacher' ? "Weaving Knowledge..." : t.summary.generating}</h3>
-
-                                {/* Progress Bar UI */}
-                                <div className="progress-container-v2" style={{ margin: '24px 0', background: 'rgba(255,255,255,0.5)', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
-                                    <div
-                                        className="progress-fill-v2"
-                                        style={{
-                                            width: `${progress}%`,
-                                            height: '100%',
-                                            background: 'var(--primary)',
-                                            borderRadius: '10px',
-                                            transition: 'width 0.5s ease-out'
-                                        }}
-                                    />
-                                </div>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600, marginTop: '-16px', marginBottom: '16px' }}>{progress}% {t.tf.complete || 'Complete'}</p>
-
-                                <p className="loading-sub">{t.summary.generatingDesc}</p>
-                            </div>
-                        </motion.div>
+                            title={role === 'teacher' ? "Weaving Knowledge..." : t.summary.generating}
+                            status={t.summary.generatingDesc}
+                        />
                     ) : error ? (
                         <motion.div
                             key="error"

@@ -98,6 +98,7 @@ class ChatManager:
                 "bookName": metadata.get("bookName"),
                 "subject": metadata.get("subject"),
                 "className": metadata.get("className"),
+                "studentName": metadata.get("studentName"),
                 "messages": [
                     # Assuming we might want to capture the initial greeting or just start here
                     user_entry,

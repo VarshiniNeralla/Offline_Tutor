@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations';
 import '../../assets/styles/student-dashboard.css'; // Reusing dashboard styles for consistency
+import ToolProcessingAnimation from './ToolProcessingAnimation';
 
 const QuizTool = () => {
     const location = useLocation();
@@ -186,7 +187,7 @@ const QuizTool = () => {
                         />
                     )}
                     {view === 'LOADING' && (
-                        <QuizLoading key="loading" />
+                        <ToolProcessingAnimation key="loading" title={t.quiz.analyzing} status={t.quiz.generatingQuestions} />
                     )}
                     {view === 'GAME' && (
                         <QuizGame
@@ -269,50 +270,7 @@ const QuizSetup = ({ qCount, setQCount, onStart }) => {
     );
 };
 
-const QuizLoading = () => {
-    const [progress, setProgress] = useState(0);
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setProgress(prev => {
-                if (prev >= 90) return 90;
-                const inc = Math.floor(Math.random() * 5) + 2;
-                return Math.min(prev + inc, 90);
-            });
-        }, 800);
-        return () => clearInterval(interval);
-    }, []);
-
-    const { language } = useLanguage();
-    const t = translations[language];
-
-    return (
-        <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="quiz-loading"
-        >
-            <div className="scanner"></div>
-            <h3>{t.quiz.analyzing}</h3>
-
-            {/* Progress Bar UI */}
-            <div className="progress-container-quiz" style={{ margin: '24px auto', background: '#e2e8f0', borderRadius: '10px', height: '8px', overflow: 'hidden', maxWidth: '300px' }}>
-                <div
-                    className="progress-fill-quiz"
-                    style={{
-                        width: `${progress}%`,
-                        height: '100%',
-                        background: 'var(--primary)',
-                        borderRadius: '10px',
-                        transition: 'width 0.5s ease-out'
-                    }}
-                />
-            </div>
-            <p style={{ marginTop: '-12px', marginBottom: '16px', fontWeight: 600, color: 'var(--primary)' }}>{progress}%</p>
-
-            <p>{t.quiz.generatingQuestions}</p>
-        </motion.div>
-    );
-};
 
 const QuizGame = ({ questions, currentQIndex, setCurrentQIndex, userAnswers, setUserAnswers, onFinish, timeElapsed, setTimeElapsed }) => {
     const { language } = useLanguage();

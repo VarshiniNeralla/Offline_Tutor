@@ -20,6 +20,7 @@ import {
     HelpCircle
 } from "lucide-react";
 import "../../assets/styles/student-dashboard.css";
+import ToolProcessingAnimation from './ToolProcessingAnimation';
 
 const OralTestTool = () => {
     const navigate = useNavigate();
@@ -261,19 +262,11 @@ const OralTestTool = () => {
                     )}
 
                     {view === 'LOADING' && (
-                        <motion.div key="loading" className="quiz-loading">
-                            <div className="loader-orbit" style={{ margin: '0 auto 24px' }}></div>
-                            <h3>{t.oral.preparing}</h3>
-                            <p>{t.oral.preparingDesc}</p>
-                        </motion.div>
+                        <ToolProcessingAnimation key="loading" title={t.oral.preparing} status={t.oral.preparingDesc} />
                     )}
 
                     {view === 'SUBMITTING' && (
-                        <motion.div key="submitting" className="quiz-loading">
-                            <div className="loader-orbit" style={{ margin: '0 auto 24px' }}></div>
-                            <h3>{t.oral.finishing}</h3>
-                            <p>{t.oral.finishingDesc}</p>
-                        </motion.div>
+                        <ToolProcessingAnimation key="submitting" title={t.oral.finishing} status={t.oral.finishingDesc} />
                     )}
 
                     {view === 'TEST' && (
