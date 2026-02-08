@@ -1,5 +1,22 @@
 [
   {
+    "id": "1770559063887",
+    "title": "Chat Mode",
+    "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",
+    "bookName": "Oceans and Continents",
+    "subject": "Social",
+    "className": "Class 6",
+    "studentName": "Raha",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "నేను *Oceans and Continents* కోసం **chat** సాధనంతో సహాయం చేయడానికి సిద్ధంగా ఉన్నాను. మీకు ఏమి కావాలి?",
+        "sources": []
+      }
+    ],
+    "timestamp": "2026-02-08T13:57:43.887Z"
+  },
+  {
     "id": "1770556419211",
     "title": "Chat Mode",
     "bookId": "cc470db9-03d0-4059-8bc3-c252847e24f1",

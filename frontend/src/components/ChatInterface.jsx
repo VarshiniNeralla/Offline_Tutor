@@ -46,6 +46,7 @@ const ChatInterface = () => {
   const { language, setLanguage } = useLanguage();
   const t = translations[language];
   const [listening, setListening] = useState(false);
+  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const bottomRef = useRef(null);
@@ -100,6 +101,7 @@ const ChatInterface = () => {
         };
 
         mediaRecorder.onstop = async () => {
+          setIsProcessingAudio(true);
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
           // CRITICAL: Save current input BEFORE any async operations
@@ -130,6 +132,7 @@ const ChatInterface = () => {
             // Don't clear input - keep what user had
             setInput(savedInput);
           } finally {
+            setIsProcessingAudio(false);
             // Stop all tracks to release mic
             stream.getTracks().forEach(track => track.stop());
           }
@@ -680,7 +683,7 @@ const ChatInterface = () => {
               <Mic size={20} />
             </button>
 
-            {!listening ? (
+            {!listening && !isProcessingAudio ? (
               <input
                 placeholder={currentChat ? t.chat.placeholder : t.dashboard.selectSubject}
                 value={input}
@@ -688,7 +691,7 @@ const ChatInterface = () => {
                 onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 disabled={!activeChatId}
               />
-            ) : (
+            ) : listening ? (
               <div className="waveform-box">
                 <div className="wave-bar"></div>
                 <div className="wave-bar"></div>
@@ -696,6 +699,13 @@ const ChatInterface = () => {
                 <div className="wave-bar"></div>
                 <div className="wave-bar"></div>
                 <span style={{ marginLeft: '10px', fontSize: '0.9rem' }}>Listening...</span>
+              </div>
+            ) : (
+              <div className="waveform-box" style={{ background: '#f8fafc', color: '#64748b' }}>
+                <div className="typing" style={{ transform: 'scale(0.8)', margin: 0 }}>
+                  <span></span><span></span><span></span>
+                </div>
+                <span style={{ marginLeft: '10px', fontSize: '0.9rem' }}>Processing audio...</span>
               </div>
             )}
 
