@@ -43,6 +43,56 @@ const QuizTool = () => {
     const [timeElapsed, setTimeElapsed] = useState(0); // in seconds
     const [errorMsg, setErrorMsg] = useState("");
 
+    // Helper function to validate and clean questions
+    const validateQuestions = (rawQuestions) => {
+        const validQuestions = [];
+        const seenQuestions = new Set();
+
+        for (let q of rawQuestions) {
+            // Check if question has required fields
+            if (!q.question || !Array.isArray(q.options) || q.correct_index === undefined) {
+                console.warn("Invalid question structure:", q);
+                continue;
+            }
+
+            // Normalize question text for duplicate detection
+            const normalizedQ = q.question.trim().toLowerCase();
+            if (seenQuestions.has(normalizedQ)) {
+                console.warn("Duplicate question detected, skipping:", q.question);
+                continue;
+            }
+
+            // Ensure exactly 4 options
+            if (q.options.length !== 4) {
+                console.warn(`Question has ${q.options.length} options instead of 4:`, q.question);
+                // Pad with empty options or trim
+                if (q.options.length < 4) {
+                    while (q.options.length < 4) {
+                        q.options.push(`Option ${q.options.length + 1}`);
+                    }
+                } else {
+                    q.options = q.options.slice(0, 4);
+                }
+            }
+
+            // Validate correct_index is within range
+            if (q.correct_index < 0 || q.correct_index > 3) {
+                console.warn("Invalid correct_index:", q.correct_index);
+                q.correct_index = 0; // Default to first option
+            }
+
+            // Ensure explanation exists
+            if (!q.explanation) {
+                q.explanation = "Check the textbook for detailed information.";
+            }
+
+            seenQuestions.add(normalizedQ);
+            validQuestions.push(q);
+        }
+
+        return validQuestions;
+    };
+
     // --- GENERATION LOGIC ---
     const startQuiz = async () => {
         if (!qCount) return;
@@ -50,7 +100,19 @@ const QuizTool = () => {
         setErrorMsg("");
 
         try {
-            const prompt = `Generate ${qCount} multiple choice questions for a quiz from the textbook "${bookName}".`;
+            // Enhanced prompt with strict requirements
+            const languageName = language === 'telugu' ? 'Telugu (తెలుగు)' : 'English';
+            const prompt = `Generate EXACTLY ${qCount} high-quality multiple choice questions from the textbook "${bookName}".
+
+STRICT REQUIREMENTS:
+1. Language: ALL questions, options, and explanations must be in ${languageName}
+2. Each question MUST have EXACTLY 4 distinct options
+3. NO duplicate or similar questions
+4. Each option must be unique and plausible
+5. Questions must be clear, specific, and fact-based
+6. Include detailed explanation for each answer
+
+Return valid JSON array format only.`;
 
             const res = await fetch('/api/chat', {
                 method: 'POST',
@@ -102,7 +164,15 @@ const QuizTool = () => {
                     throw new Error("No questions were generated. The AI might be busy or the textbook content is unreadable.");
                 }
 
-                setQuestions(parsedQuestions);
+                // Validate and clean questions
+                const validatedQuestions = validateQuestions(parsedQuestions);
+
+                if (validatedQuestions.length === 0) {
+                    throw new Error("All generated questions were invalid. Please try again.");
+                }
+
+                console.log(`✅ Validated ${validatedQuestions.length} out of ${parsedQuestions.length} questions`);
+                setQuestions(validatedQuestions);
                 setView('GAME');
             } else {
                 throw new Error("Backend did not return quiz mode");
@@ -110,7 +180,7 @@ const QuizTool = () => {
 
         } catch (err) {
             console.error("Quiz Gen Error", err);
-            setErrorMsg("Could not connect to the AI Tutor.");
+            setErrorMsg(err.message || "Could not connect to the AI Tutor.");
             setView('ERROR');
         }
     };
@@ -233,6 +303,9 @@ const QuizTool = () => {
 const QuizSetup = ({ qCount, setQCount, onStart }) => {
     const { language } = useLanguage();
     const t = translations[language];
+
+    const languageDisplay = language === 'telugu' ? 'తెలుగు (Telugu)' : 'English';
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
@@ -242,6 +315,18 @@ const QuizSetup = ({ qCount, setQCount, onStart }) => {
                 <div className="quiz-icon-large"><Brain size={48} /></div>
                 <h2>{t.quiz.challengeHeader}</h2>
                 <p>{t.quiz.challengeSubheader}</p>
+                <div className="language-badge" style={{
+                    marginTop: '12px',
+                    display: 'inline-block',
+                    padding: '6px 16px',
+                    background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                    color: 'white',
+                    borderRadius: '20px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600'
+                }}>
+                    📝 {languageDisplay}
+                </div>
             </div>
 
             <div className="quiz-options-grid">
@@ -455,12 +540,43 @@ const QuizResults = ({ questions, userAnswers, timeElapsed, onRetry, onExit }) =
 const QuizError = ({ message, onRetry }) => {
     const { language } = useLanguage();
     const t = translations[language];
+
+    // Provide language-specific error messages
+    const errorMessages = {
+        english: {
+            noQuestions: "No questions were generated. Please try again.",
+            invalidQuestions: "Generated questions were invalid. Please try again.",
+            serverError: "Could not connect to the AI Tutor. Please check your connection.",
+            parseError: "Failed to process quiz data. Please try again."
+        },
+        telugu: {
+            noQuestions: "ప్రశ్నలు రూపొందించబడలేదు. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+            invalidQuestions: "రూపొందించిన ప్రశ్నలు చెల్లవు. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+            serverError: "AI ట్యూటర్‌కు కనెక్ట్ చేయలేకపోయింది. దయచేసి మీ కనెక్షన్‌ని తనిఖీ చేయండి.",
+            parseError: "క్విజ్ డేటాను ప్రాసెస్ చేయడంలో విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి."
+        }
+    };
+
+    // Detect error type and show appropriate message
+    let displayMessage = message;
+    const msgs = errorMessages[language] || errorMessages.english;
+
+    if (message.includes("No questions")) {
+        displayMessage = msgs.noQuestions;
+    } else if (message.includes("invalid")) {
+        displayMessage = msgs.invalidQuestions;
+    } else if (message.includes("connect") || message.includes("Server")) {
+        displayMessage = msgs.serverError;
+    } else if (message.includes("parse") || message.includes("JSON")) {
+        displayMessage = msgs.parseError;
+    }
+
     return (
         <div className="quiz-error">
             <AlertCircle size={48} className="error-icon" />
-            <h3>{t.quiz.errorHeader}</h3>
-            <p>{message}</p>
-            <button onClick={onRetry} className="retry-btn">{t.quiz.retry}</button>
+            <h3>{t.quiz.errorHeader || (language === 'telugu' ? 'లోపం' : 'Error')}</h3>
+            <p>{displayMessage}</p>
+            <button onClick={onRetry} className="retry-btn">{t.quiz.retry || (language === 'telugu' ? 'మళ్ళీ ప్రయత్నించండి' : 'Try Again')}</button>
         </div>
     );
 };

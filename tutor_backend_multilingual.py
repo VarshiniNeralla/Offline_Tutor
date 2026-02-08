@@ -1170,35 +1170,28 @@ Start with: "This topic isn't in your textbook, but I can explain..."
             print(f"⚠️ Quiz context search failed: {e}")
             context = "No specific textbook context found."
 
-        # 3. Robust Prompt for Code-Block JSON with Verification Logic (Language-aware)
-        if self.language == 'telugu':
-            prompt = f"""మీరు ఒక నిపుణుడైన క్విజ్ నిర్మాత. JSON ఫార్మాట్‌లో 5 ప్రశ్నల క్విజ్ సృష్టించండి.
+        # 3. Robust Prompt for Code-Block JSON with Verification Logic
+        # NOTE: We generate in English first, then translate for better reliability with small models
+        prompt = f"""You are an elite Quiz Expert. Generate EXACTLY 5 high-quality multiple choice questions in JSON format.
 
-సందర్భం (CONTEXT):
+CONTEXT (from textbook):
 {context}
 
-నియమాలు (RULES):
-- స్వచ్ఛమైన ఆప్షన్లు: కేవలం సమాధాన టెక్స్ట్ మాత్రమే. "A)", "B.", లేదా "1)" ప్రిఫిక్స్‌లు వద్దు.
-- పరస్పర విశిష్టత: ఆప్షన్లు విభిన్నంగా ఉండాలి. ఒక ఆప్షన్ మాత్రమే సరైనది.
-- వివరణ మొదట: "explanation" మొదట వ్రాసి, తర్వాత సరైన సూచిక ఎంచుకోండి.
-- నిండుగా: ఉదాహరణ టెక్స్ట్ ఉపయోగించవద్దు. అసలైన, సందర్భానికి సంబంధించిన ఆప్షన్లు సృష్టించండి.
-- స్కీమా: [{{"id": 1, "question": "ఉదాహరణ?", "options": ["ఆప్షన్ A", "ఆప్షన్ B", "ఆప్షన్ C", "ఆప్షన్ D"], "explanation": "వాస్తవం.", "correct_index": 0}}]
+CRITICAL REQUIREMENTS:
+1. Return ONLY a JSON array - nothing else
+2. Each question must have EXACTLY 4 options
+3. Format: [{{"question": "text", "options": ["A", "B", "C", "D"], "correct_index": 0, "explanation": "why"}}]
+4. NO prefixes like "A)", "1)", etc in options
+5. correct_index must be 0, 1, 2, or 3
+6. All questions must be distinct and fact-based
 
-JSON అవుట్‌పుట్ (తెలుగులో ప్రశ్నలు మరియు ఆప్షన్లు):"""
-        else:
-            prompt = f"""You are an elite Quiz Expert. Generate a logical 5-question quiz in JSON format.
+Example format:
+[
+  {{"question": "What is the largest ocean?", "options": ["Pacific Ocean", "Atlantic Ocean", "Indian Ocean", "Arctic Ocean"], "correct_index": 0, "explanation": "The Pacific Ocean is the largest ocean covering about 165 million square kilometers."}},
+  {{"question": "Which continent has the most countries?", "options": ["Africa", "Asia", "Europe", "South America"], "correct_index": 0, "explanation": "Africa has 54 countries, more than any other continent."}}
+]
 
-CONTEXT:
-{context}
-
-RULES:
-- CLEAN OPTIONS: Provide only answer text. NO "A)", "B.", or "1)" prefixes.
-- MUTUAL EXCLUSIVITY: Options must be distinct. Only ONE option must be true.
-- REASONING FIRST: Write the "explanation" FIRST to confirm the facts, then pick the correct numerical index.
-- NO FILLER: Do NOT use example text from the schema below. Create original, contextual options.
-- Schema: [{{"id": 1, "question": "Example?", "options": ["Option A", "Option B", "Option C", "Option D"], "explanation": "Fact.", "correct_index": 0}}]
-
-JSON OUTPUT:"""
+Generate 5 questions now in this exact format:"""
 
         # 4. Call LLM (Locked temperature for maximum accuracy)
         print(f"🧩 Sending quiz request to AI ({self.model_name})...")
@@ -1220,13 +1213,31 @@ JSON OUTPUT:"""
             
             if isinstance(json_data, dict):
                 json_data = json_data.get("quiz", json_data.get("questions", [json_data]))
-            
+
             # Validate and filter with extreme leniency
             valid_questions = []
+            seen_questions = set()  # Track duplicates
             if not isinstance(json_data, list):
-                # Check for "quiz" or "questions" wrappers
+                # Check for "quiz" or "questions" wrappers with EXTREME flexibility
                 if isinstance(json_data, dict):
-                    found_list = json_data.get("quiz", json_data.get("questions", json_data.get("data", [])))
+                    # Try common keys first
+                    found_list = json_data.get("quiz", json_data.get("questions", json_data.get("data", None)))
+
+                    # If not found, search for ANY key that contains "questions" or is a list
+                    if found_list is None:
+                        for key, value in json_data.items():
+                            if isinstance(value, list) and len(value) > 0:
+                                # Check if this list contains question-like objects
+                                if isinstance(value[0], dict) and ("question" in value[0] or "text" in value[0] or "q" in value[0]):
+                                    found_list = value
+                                    print(f"🔧 Found questions array in unexpected key: '{key}'")
+                                    break
+                            elif isinstance(value, dict) and "questions" in value:
+                                # Handle nested structure like {"prize": {"questions": [...]}}
+                                found_list = value["questions"]
+                                print(f"🔧 Found nested questions in key: '{key}.questions'")
+                                break
+
                     if isinstance(found_list, list):
                         json_data = found_list
                     else:
@@ -1246,16 +1257,29 @@ JSON OUTPUT:"""
                 if not question_text:
                     print(f"⚠️ Question {i} discarded: No question text found.")
                     continue
-                
+
+                # Check for duplicate questions
+                normalized_q = question_text.strip().lower()
+                if normalized_q in seen_questions:
+                    print(f"⚠️ Question {i} discarded: Duplicate question detected.")
+                    continue
+                seen_questions.add(normalized_q)
+
                 # Final check for valid options
                 if not isinstance(options, list) or len(options) < 2:
                     print(f"⚠️ Question {i} discarded: Options invalid or too few ({len(options) if isinstance(options, list) else 'type: '+str(type(options))})")
                     continue
-                
+
+                # Ensure exactly 4 options
+                if len(options) < 4:
+                    print(f"⚠️ Question {i} has only {len(options)} options, padding to 4")
+                    while len(options) < 4:
+                        options.append(f"Option {len(options) + 1}")
+
                 valid_questions.append({
                     "id": len(valid_questions) + 1,
                     "question": question_text,
-                    "options": options[:4], # Keep max 4 for UI
+                    "options": options[:4], # Keep exactly 4 for UI
                     "correct_index": int(correct_idx) if str(correct_idx).isdigit() else 0,
                     "explanation": explanation
                 })
@@ -1266,6 +1290,26 @@ JSON OUTPUT:"""
                 raise ValueError("No valid questions found.")
 
             print(f"✅ Successfully validated {len(valid_questions)} questions.")
+
+            # Translate to Telugu if needed
+            if self.language == 'telugu':
+                print("🔄 Translating quiz questions from English to Telugu...")
+                try:
+                    translated_questions = []
+                    for q in valid_questions:
+                        translated_q = {
+                            "id": q["id"],
+                            "question": self.translate_text(q["question"], 'english', 'telugu'),
+                            "options": [self.translate_text(opt, 'english', 'telugu') for opt in q["options"]],
+                            "correct_index": q["correct_index"],
+                            "explanation": self.translate_text(q["explanation"], 'english', 'telugu')
+                        }
+                        translated_questions.append(translated_q)
+                    valid_questions = translated_questions
+                    print(f"✅ Translation to Telugu completed for {len(valid_questions)} questions")
+                except Exception as e:
+                    print(f"⚠️ Translation failed: {e}. Returning English version.")
+
             final_json = json.dumps(valid_questions)
             print(f"✅ Got response, mode=quiz, response length={len(final_json)}")
             return final_json, [], "quiz"
