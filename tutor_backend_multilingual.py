@@ -1732,79 +1732,174 @@ CRITICAL RULES:
         return all_questions, [], "oral_test"
 
     def generate_mindmap_response(self, book_id: str, language: str = 'en'):
-        """Generates a hierarchical mind map structure (English -> Translated)."""
+        """Generates a hierarchical mind map structure using JSON format for reliability."""
         print(f"🧠 Generating Mind Map for book_id: {book_id}...")
-        
+
         # 1. Retrieve Context
         try:
-            docs = self.vectorstore.similarity_search("Main concepts and structure", k=12, filter={"book_id": book_id})
+            docs = self.vectorstore.similarity_search("Main concepts and structure", k=15, filter={"book_id": book_id})
             context = "\n\n".join([doc.page_content for doc in docs])
             if not context: return {"error": "Content not found."}, [], "error"
         except Exception as e:
             return {"error": "Database error."}, [], "error"
 
-        # 2. English Prompt (Line-Based)
-        prompt = f"""### SYSTEM:
-Create a hierarchical mind map in English.
+        # 2. Improved prompt for clean, organized mind map
+        prompt = f"""Create a clean, organized mind map JSON. Each subtopic MUST be different.
+
 Format:
-ROOT: [Chapter Title]
-SUBTOPIC: [Main Branch]
-CONCEPT: [Key Concept]
-DETAIL: [Brief Detail]
+{{
+  "title": "Chapter Name",
+  "subtopics": [
+    {{"name": "First Topic", "concepts": [{{"name": "Concept A", "details": ["fact 1"]}}]}},
+    {{"name": "Second Different Topic", "concepts": [{{"name": "Concept B", "details": ["fact 2"]}}]}},
+    {{"name": "Third Unique Topic", "concepts": [{{"name": "Concept C", "details": ["fact 3"]}}]}}
+  ]
+}}
 
-Rules:
-- NO questions.
-- 5-8 Subtopics.
-- 3 Concepts per Subtopic.
+CRITICAL RULES:
+- Generate EXACTLY 5-6 subtopics
+- Each subtopic name must be COMPLETELY DIFFERENT
+- EXACTLY 2 concepts per subtopic (for clean layout)
+- Each concept must be UNIQUE (no duplicates)
+- 1-2 short details per concept
+- Cover different aspects of the content
 
-### TEXT:
-{context[:6000]}
+Content:
+{context[:3500]}
 
-### MIND MAP OUTPUT:"""
+JSON:"""
 
-        # 3. Generation
-        response_text = self.call_llama_optimized(prompt, num_predict=3000, temperature=0.4)
-        
-        # 4. Parse
+        # 3. Generation with higher temperature for diversity
+        print(f"🤖 Calling LLM for mind map generation...")
+        response_text = self.call_llama_optimized(prompt, num_predict=1200, temperature=0.4, format="json")
+        print(f"📝 Generated response ({len(response_text)} chars)")
+
+        # 4. Parse JSON response with repair logic
         try:
-            mind_map = {"title": "Mind Map", "subtopics": []}
-            curr_sub = None
-            curr_con = None
-            
+            # Clean response
+            response_text = response_text.strip()
+
+            # Find JSON boundaries
+            if '{' in response_text:
+                start = response_text.find('{')
+                end = response_text.rfind('}') + 1
+                response_text = response_text[start:end]
+
+            # Try to parse JSON
+            try:
+                mind_map_raw = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                # Attempt to repair malformed JSON
+                print(f"⚠️ Malformed JSON detected, attempting repair...")
+
+                # Strategy 1: Fix incomplete strings by closing quotes
+                import re
+
+                # Find the last complete object/array
+                # Count opening and closing braces/brackets
+                fixed_json = response_text
+
+                # Remove any incomplete string at the end (truncated text)
+                # Look for patterns like: "text that is not
+                fixed_json = re.sub(r',\s*\{\s*"[^"]*"\s*:\s*"[^"]*$', '', fixed_json)
+                fixed_json = re.sub(r',\s*"[^"]*"\s*:\s*"[^"]*$', '', fixed_json)
+
+                # Close any unclosed arrays
+                open_brackets = fixed_json.count('[') - fixed_json.count(']')
+                fixed_json += ']' * open_brackets
+
+                # Close any unclosed objects
+                open_braces = fixed_json.count('{') - fixed_json.count('}')
+                fixed_json += '}' * open_braces
+
+                # Remove trailing commas before closing brackets
+                fixed_json = re.sub(r',\s*\]', ']', fixed_json)
+                fixed_json = re.sub(r',\s*\}', '}', fixed_json)
+
+                print(f"🔧 Repaired JSON, retrying parse...")
+                mind_map_raw = json.loads(fixed_json)
+
+            # Add IDs to the structure for frontend
+            mind_map = {
+                "title": mind_map_raw.get("title", "Mind Map"),
+                "subtopics": []
+            }
+
             seen_ids = set()
-            def gid(p): 
-                ni = f"{p}_{len(seen_ids)}"
+            def gid(prefix):
+                ni = f"{prefix}_{len(seen_ids)}"
                 seen_ids.add(ni)
                 return ni
 
-            for line in response_text.split('\n'):
-                line = line.strip()
-                if not line: continue
-                
-                if line.startswith("ROOT:"):
-                    mind_map["title"] = line.replace("ROOT:", "").strip()
-                elif line.startswith("SUBTOPIC:"):
-                    curr_sub = {"id": gid("st"), "name": line.replace("SUBTOPIC:", "").strip(), "concepts": []}
-                    mind_map["subtopics"].append(curr_sub)
-                    curr_con = None
-                elif line.startswith("CONCEPT:") and curr_sub:
-                    curr_con = {"id": gid("c"), "name": line.replace("CONCEPT:", "").strip(), "details": [], "connections": []}
-                    curr_sub["concepts"].append(curr_con)
-                elif line.startswith("DETAIL:") and curr_con:
-                    curr_con["details"].append(line.replace("DETAIL:", "").strip())
+            # Deduplication sets
+            seen_subtopics = set()
+            seen_concepts = set()
 
-            # 5. Translate
-            if language == 'telugu': # Use passed language arg or self.language
+            for st in mind_map_raw.get("subtopics", []):
+                subtopic_name = st.get("name", "").strip()
+
+                # Skip duplicate subtopics
+                if subtopic_name in seen_subtopics or not subtopic_name:
+                    print(f"⚠️ Skipping duplicate subtopic: {subtopic_name}")
+                    continue
+
+                seen_subtopics.add(subtopic_name)
+
+                subtopic = {
+                    "id": gid("st"),
+                    "name": subtopic_name,
+                    "concepts": []
+                }
+
+                # Reset concept tracking for each subtopic
+                subtopic_concepts = set()
+
+                for c in st.get("concepts", []):
+                    concept_name = c.get("name", "").strip()
+
+                    # Skip duplicate concepts within this subtopic
+                    if concept_name in subtopic_concepts or not concept_name:
+                        continue
+
+                    subtopic_concepts.add(concept_name)
+
+                    concept = {
+                        "id": gid("c"),
+                        "name": concept_name,
+                        "details": c.get("details", []),
+                        "connections": []
+                    }
+                    subtopic["concepts"].append(concept)
+
+                # Only add subtopic if it has concepts
+                if subtopic["concepts"]:
+                    mind_map["subtopics"].append(subtopic)
+
+            print(f"✅ Parsed {len(mind_map['subtopics'])} unique subtopics (after deduplication)")
+
+            # Validate
+            if len(mind_map.get('subtopics', [])) < 2:
+                print(f"⚠️ Warning: Only {len(mind_map.get('subtopics', []))} subtopics generated")
+                if not mind_map['subtopics']:
+                    return {"error": "Could not generate mind map. Please try again."}, [], "error"
+
+            # 5. Translate if needed
+            if language == 'telugu' and self.language == 'telugu':
                 print("🔄 Translating Mind Map to Telugu...")
-                # self.language is reliable here
-                if self.language == 'telugu':
-                    mind_map = self.translate_structure(mind_map, 'telugu')
+                mind_map = self.translate_structure(mind_map, 'telugu')
+                print("✅ Translation complete")
 
             return mind_map, [], "mindmap"
 
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON parsing failed: {e}")
+            print(f"📄 Response: {response_text[:500]}")
+            return {"error": "Failed to generate mind map. Please try again."}, [], "error"
         except Exception as e:
             print(f"❌ Mind Map error: {e}")
-            return {"error": "Parsing error."}, [], "error"
+            import traceback
+            traceback.print_exc()
+            return {"error": f"Error: {str(e)}"}, [], "error"
 
     def transcribe_file(self, audio_path):
         """Transcribe an audio file using the local Whisper model."""

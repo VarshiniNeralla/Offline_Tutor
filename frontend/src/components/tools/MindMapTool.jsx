@@ -161,28 +161,28 @@ const MindMapTool = () => {
     const [links, setLinks] = useState([]);
     const [draggingNodeId, setDraggingNodeId] = useState(null);
 
-    // Initial Layout Calculation
+    // Initial Layout Calculation - Improved for better spacing
     useEffect(() => {
         if (!mindMapData) return;
 
         const newNodes = [];
         const newLinks = [];
 
-        // Settings
-        const CENTER_X = 400;
-        const CENTER_Y = 300;
+        // Settings - Larger canvas for better spacing
+        const CENTER_X = 500;
+        const CENTER_Y = 400;
 
         // Dynamic Layout Calculation
-        const subtopicCount = mindMapData.subtopics?.length || 0;
+        const subtopics = mindMapData.subtopics || [];
+        const subtopicCount = subtopics.length;
 
-        // DUAL RING LAYOUT (Zig-Zag)
-        // Helps prevent clutter by alternating distances
-        const INNER_RADIUS = 320;
-        const OUTER_RADIUS = 550; // Big jump to clear text
+        // IMPROVED RADIAL LAYOUT - Single ring with generous spacing
+        // Adjust radius based on number of subtopics for optimal spacing
+        const BASE_RADIUS = subtopicCount <= 4 ? 300 : subtopicCount <= 6 ? 340 : 380;
 
-        // Calculate Auto-Fit Zoom based on the outer ring
-        const maxExtent = OUTER_RADIUS + 250;
-        const fitZoom = Math.min(1, 550 / maxExtent);
+        // Calculate Auto-Fit Zoom - account for concept nodes
+        const maxExtent = BASE_RADIUS + 280; // Extra space for concepts
+        const fitZoom = Math.min(0.9, 800 / maxExtent);
 
         // Only apply auto-zoom on FIRST load (not drag updates)
         if (nodes.length === 0 && !localStorage.getItem(`mindmap_pos_${bookId}`)) {
@@ -198,19 +198,16 @@ const MindMapTool = () => {
             y: CENTER_Y
         });
 
-        const subtopics = mindMapData.subtopics || [];
-        const angleStep = (2 * Math.PI) / (subtopics.length || 1);
+        // Add offset to first subtopic for better visual balance
+        const startAngle = -Math.PI / 2; // Start from top
+        const angleStep = (2 * Math.PI) / (subtopicCount || 1);
 
         subtopics.forEach((st, stIdx) => {
-            const angle = stIdx * angleStep;
-
-            // ALTERNATING RADIUS: Even = Inner, Odd = Outer
-            const isOuter = stIdx % 2 !== 0;
-            const radius = isOuter ? OUTER_RADIUS : INNER_RADIUS;
-
-            const stX = CENTER_X + Math.cos(angle) * radius;
-            const stY = CENTER_Y + Math.sin(angle) * radius;
+            const angle = startAngle + (stIdx * angleStep);
             const color = getSubtopicColor(stIdx);
+
+            const stX = CENTER_X + Math.cos(angle) * BASE_RADIUS;
+            const stY = CENTER_Y + Math.sin(angle) * BASE_RADIUS;
 
             // Subtopic Node
             newNodes.push({
@@ -226,25 +223,23 @@ const MindMapTool = () => {
             // Link to Center
             newLinks.push({ source: "center", target: st.id, color: color });
 
-            // Fan out concepts
+            // Fan out concepts with improved spacing and collision avoidance
             if (!collapsedNodes.has(st.id)) {
                 const concepts = st.concepts || [];
-                concepts.forEach((c, cIdx) => {
-                    // Concepts also need more space if on inner ring
-                    const dist = 160;
+                const conceptCount = concepts.length;
 
-                    // Fan spread calculation
-                    const spreadAngle = (cIdx - (concepts.length - 1) / 2) * 0.35;
-                    const cAngle = angle + spreadAngle;
-
-                    const cX = stX + Math.cos(cAngle) * dist;
-                    const cY = stY + Math.sin(cAngle) * dist;
+                // Arrange concepts in a more organized pattern
+                if (conceptCount === 1) {
+                    // Single concept: place directly away from center
+                    const dist = 220;
+                    const cX = stX + Math.cos(angle) * dist;
+                    const cY = stY + Math.sin(angle) * dist;
 
                     newNodes.push({
-                        id: c.id,
+                        id: concepts[0].id,
                         type: "concept",
-                        label: c.name,
-                        details: c.details,
+                        label: concepts[0].name,
+                        details: concepts[0].details,
                         x: cX,
                         y: cY,
                         color: color,
@@ -252,8 +247,59 @@ const MindMapTool = () => {
                         subtopicId: st.id
                     });
 
-                    newLinks.push({ source: st.id, target: c.id, color: color });
-                });
+                    newLinks.push({ source: st.id, target: concepts[0].id, color: color });
+                } else if (conceptCount === 2) {
+                    // Two concepts: place on either side
+                    const dist = 220;
+                    const spread = 0.5;
+
+                    concepts.forEach((c, cIdx) => {
+                        const side = cIdx === 0 ? -1 : 1;
+                        const cAngle = angle + (spread * side);
+                        const cX = stX + Math.cos(cAngle) * dist;
+                        const cY = stY + Math.sin(cAngle) * dist;
+
+                        newNodes.push({
+                            id: c.id,
+                            type: "concept",
+                            label: c.name,
+                            details: c.details,
+                            x: cX,
+                            y: cY,
+                            color: color,
+                            parentColor: color,
+                            subtopicId: st.id
+                        });
+
+                        newLinks.push({ source: st.id, target: c.id, color: color });
+                    });
+                } else {
+                    // Three or more: arrange in arc with extra spacing
+                    const dist = 240;
+                    const maxSpread = conceptCount === 3 ? 0.6 : 0.7;
+
+                    concepts.forEach((c, cIdx) => {
+                        const spreadAngle = (cIdx - (conceptCount - 1) / 2) * maxSpread;
+                        const cAngle = angle + spreadAngle;
+
+                        const cX = stX + Math.cos(cAngle) * dist;
+                        const cY = stY + Math.sin(cAngle) * dist;
+
+                        newNodes.push({
+                            id: c.id,
+                            type: "concept",
+                            label: c.name,
+                            details: c.details,
+                            x: cX,
+                            y: cY,
+                            color: color,
+                            parentColor: color,
+                            subtopicId: st.id
+                        });
+
+                        newLinks.push({ source: st.id, target: c.id, color: color });
+                    });
+                }
             }
         });
 
@@ -332,12 +378,13 @@ const MindMapTool = () => {
         if (node.type === 'center') {
             return (
                 <g key={node.id} {...commonProps}>
-                    <circle r="50" fill="#2D3436" stroke="#fff" strokeWidth="3" />
-                    <foreignObject x="-45" y="-30" width="90" height="60" style={{ pointerEvents: 'none' }}>
+                    <circle r="60" fill="#2D3436" stroke="#fff" strokeWidth="4" />
+                    <foreignObject x="-55" y="-35" width="110" height="70" style={{ pointerEvents: 'none' }}>
                         <div style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             height: '100%', color: 'white', textAlign: 'center',
-                            fontSize: '14px', fontWeight: 'bold'
+                            fontSize: '13px', fontWeight: 'bold', lineHeight: '1.3',
+                            padding: '5px'
                         }}>
                             {node.label}
                         </div>
@@ -350,25 +397,26 @@ const MindMapTool = () => {
             const isCollapsed = collapsedNodes.has(node.id);
             return (
                 <g key={node.id} {...commonProps}>
-                    {/* Hit area for drag */}
-                    <rect x="-60" y="-30" width="120" height="60" rx="15" fill={node.color} stroke="white" strokeWidth="2" />
-                    <foreignObject x="-55" y="-25" width="110" height="50" style={{ pointerEvents: 'none' }}>
+                    {/* Larger hit area for better readability */}
+                    <rect x="-75" y="-35" width="150" height="70" rx="18" fill={node.color} stroke="white" strokeWidth="3" />
+                    <foreignObject x="-70" y="-30" width="140" height="60" style={{ pointerEvents: 'none' }}>
                         <div style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             height: '100%', color: 'white', textAlign: 'center',
-                            fontWeight: '600', fontSize: '12px'
+                            fontWeight: '600', fontSize: '11.5px', lineHeight: '1.3',
+                            padding: '4px', overflow: 'hidden'
                         }}>
                             {node.label}
                         </div>
                     </foreignObject>
 
-                    {/* Interactive buttons must stop propagation to prevent drag start */}
+                    {/* Interactive buttons */}
                     <g
                         onClick={(e) => { e.stopPropagation(); toggleCollapse(node.id); }}
                         style={{ cursor: 'pointer' }}
                     >
-                        <circle cx="0" cy="30" r="10" fill="white" stroke={node.color} />
-                        <text x="0" y="34" textAnchor="middle" fontSize="14" fontWeight="bold" fill={node.color}>
+                        <circle cx="0" cy="38" r="12" fill="white" stroke={node.color} strokeWidth="2" />
+                        <text x="0" y="43" textAnchor="middle" fontSize="16" fontWeight="bold" fill={node.color}>
                             {isCollapsed ? '+' : '-'}
                         </text>
                     </g>
@@ -379,20 +427,30 @@ const MindMapTool = () => {
         if (node.type === 'concept') {
             return (
                 <g key={node.id} {...commonProps}>
-                    <rect x="-50" y="-25" width="100" height="50" rx="8" fill="white" stroke={node.color} strokeWidth="2" />
-                    <foreignObject x="-48" y="-22" width="96" height="46" style={{ pointerEvents: 'none' }}>
+                    <rect x="-60" y="-28" width="120" height="56" rx="10" fill="white" stroke={node.color} strokeWidth="2.5" />
+                    <foreignObject x="-56" y="-24" width="112" height="48" style={{ pointerEvents: 'none' }}>
                         <div style={{
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            height: '100%', textAlign: 'center'
+                            height: '100%', textAlign: 'center', padding: '2px'
                         }}>
-                            <span style={{ color: '#2d3436', fontWeight: '500', fontSize: '11px', lineHeight: '1.2' }}>
+                            <span style={{
+                                color: '#2d3436',
+                                fontWeight: '500',
+                                fontSize: '10.5px',
+                                lineHeight: '1.25',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: 'vertical'
+                            }}>
                                 {node.label}
                             </span>
                         </div>
                     </foreignObject>
 
                     {node.details && node.details.length > 0 && (
-                        <circle cx="50" cy="-25" r="6" fill="#F1C40F" />
+                        <circle cx="58" cy="-26" r="7" fill="#F1C40F" stroke="white" strokeWidth="2" />
                     )}
                 </g>
             )
@@ -404,23 +462,38 @@ const MindMapTool = () => {
         const targetNode = nodes.find(n => n.id === link.target);
         if (!sourceNode || !targetNode) return null;
 
-        const midX = (sourceNode.x + targetNode.x) / 2;
-        const midY = (sourceNode.y + targetNode.y) / 2;
-        const path = `M ${sourceNode.x} ${sourceNode.y} Q ${midX} ${midY} ${targetNode.x} ${targetNode.y}`;
+        // Create smoother curves with better control points
+        const dx = targetNode.x - sourceNode.x;
+        const dy = targetNode.y - sourceNode.y;
+
+        // Use bezier curves for smoother connections
+        const controlOffset = 0.3;
+        const cx1 = sourceNode.x + dx * controlOffset;
+        const cy1 = sourceNode.y + dy * controlOffset;
+        const cx2 = sourceNode.x + dx * (1 - controlOffset);
+        const cy2 = sourceNode.y + dy * (1 - controlOffset);
+
+        const path = `M ${sourceNode.x} ${sourceNode.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${targetNode.x} ${targetNode.y}`;
 
         const isDimmed = focusedSubtopic
             && sourceNode.subtopicId !== focusedSubtopic
             && targetNode.subtopicId !== focusedSubtopic
             && sourceNode.type !== 'center';
 
+        // Thicker lines for center-to-subtopic, thinner for subtopic-to-concept
+        const isMainLink = sourceNode.type === 'center';
+        const strokeWidth = isMainLink ? 3 : 2;
+        const opacity = isDimmed ? 0.1 : isMainLink ? 0.7 : 0.5;
+
         return (
             <path
                 key={`${link.source}-${link.target}`}
                 d={path}
                 stroke={link.color || '#ccc'}
-                strokeWidth="2"
+                strokeWidth={strokeWidth}
                 fill="none"
-                opacity={isDimmed ? 0.1 : 0.6}
+                opacity={opacity}
+                strokeLinecap="round"
             />
         );
     };
@@ -485,9 +558,11 @@ const MindMapTool = () => {
                 onMouseLeave={handleCanvasMouseUp}
             >
                 <svg
+                    ref={svgRef}
                     width="100%"
                     height="100%"
-                    viewBox="0 0 800 600"
+                    viewBox="0 0 1000 800"
+                    style={{ background: 'transparent' }}
                 >
                     <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
                         {/* Render Links First (Behind nodes) */}
